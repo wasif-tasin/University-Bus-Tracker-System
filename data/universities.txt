@@ -1,0 +1,3 @@
+BUBT|Bangladesh University of Business and Technology
+SUB|State University of Bangladesh
+SEU|Southeast University

@@ -1,0 +1,9 @@
+B1|Buriganga|BUBT|50|Asad Gate,Shyamoli,Mirpur-1,Rainkhola,BUBT Campus
+B2|Brahmaputra|BUBT|50|Hemayetpur,Amin Bazar,Gabtoli,Mazar Road
+B3|Padma|BUBT|50|Shyamoli,Shishu Mela,Aggargaon,Kazipara,Mirpur-10
+S1|Gulistan|SUB|50|Gulistan,Paltan,Kakrail,Mouchak,Malibag,Rampura
+S2|Shyamoli|SUB|50|Shyamoli,Kallyanpur,Technical,Ansar Camp,Mirpur-1
+S3|Mirpur-10|SUB|50|Mirpur-10,Kazipara,Shewrapara,Aggargaon,Link Road
+E1|Mirpur-Kalshi|SEU|50|Kalshi,Mirpur-12,Mirpur-10,Kazipara,Shewrapara
+E2|Khilkhet-Tongi|SEU|50|Tongi,Abdullahpur,House Building,Azampur
+E3|Mohammadpur|SEU|50|Azimpur,Science Lab,Jigatola,Moni Dhanmondi-15
