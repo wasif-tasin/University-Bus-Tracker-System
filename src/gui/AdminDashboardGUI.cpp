@@ -18,7 +18,7 @@ static std::string wrapRoute(const std::string& route, float maxWidth, const sf:
     sf::Text tempText(font);
     tempText.setCharacterSize(characterSize);
 
-    // Split route by commas
+
     std::vector<std::string> stops;
     std::string stop = "";
     for (char c : route)
@@ -105,7 +105,6 @@ void AdminDashboardGUI::run()
 
     Admin admin;
 
-    // --- SHARED TEXT ELEMENTS ---
     sf::Text title(font);
     title.setString("ADMIN DASHBOARD");
     title.setCharacterSize(34);
@@ -115,7 +114,6 @@ void AdminDashboardGUI::run()
     infoMsg.setCharacterSize(20);
     infoMsg.setFillColor(sf::Color::Yellow);
 
-    // --- DASHBOARD BUTTONS ---
     Button addUniBtn(font, "Add University", {300.f, 50.f}, {300.f, 120.f});
     Button viewUniBtn(font, "View University", {300.f, 50.f}, {300.f, 190.f});
     Button addBusBtn(font, "Add Bus", {300.f, 50.f}, {300.f, 260.f});
@@ -124,7 +122,6 @@ void AdminDashboardGUI::run()
     Button deleteUniBtn(font, "Delete University", {300.f, 50.f}, {300.f, 470.f});
     Button logoutBtn(font, "Logout", {300.f, 50.f}, {300.f, 540.f});
 
-    // --- ADD UNIVERSITY VIEW ---
     sf::Text codeLabel(font);
     codeLabel.setString("University Code:");
     codeLabel.setCharacterSize(18);
@@ -144,7 +141,6 @@ void AdminDashboardGUI::run()
     Button uniSubmit(font, "Add", {150.f, 50.f}, {200.f, 380.f});
     Button uniBack(font, "Back", {150.f, 50.f}, {400.f, 380.f});
 
-    // --- DELETE UNIVERSITY VIEW ---
     sf::Text delUniLabel(font);
     delUniLabel.setString("Enter University Code to Delete:");
     delUniLabel.setCharacterSize(18);
@@ -156,7 +152,6 @@ void AdminDashboardGUI::run()
     Button delUniSubmit(font, "Delete", {150.f, 50.f}, {200.f, 300.f});
     Button delUniBack(font, "Back", {150.f, 50.f}, {400.f, 300.f});
 
-    // --- ADD BUS VIEW ---
     sf::Text bIdLabel(font); bIdLabel.setString("Bus ID:"); bIdLabel.setCharacterSize(18); bIdLabel.setFillColor(sf::Color::White); bIdLabel.setPosition({100.f, 120.f});
     TextBox busIdBox(font, {300.f, 45.f}, {100.f, 150.f});
 
@@ -175,7 +170,6 @@ void AdminDashboardGUI::run()
     Button busSubmit(font, "Add Bus", {150.f, 50.f}, {100.f, 440.f});
     Button busBack(font, "Back", {150.f, 50.f}, {280.f, 440.f});
 
-    // --- DELETE BUS VIEW ---
     sf::Text delBusLabel(font);
     delBusLabel.setString("Enter Bus ID to Delete:");
     delBusLabel.setCharacterSize(18);
@@ -187,19 +181,16 @@ void AdminDashboardGUI::run()
     Button delBusSubmit(font, "Delete", {150.f, 50.f}, {200.f, 300.f});
     Button delBusBack(font, "Back", {150.f, 50.f}, {400.f, 300.f});
 
-    // --- PAGINATION BUTTONS ---
     Button prevPageBtn(font, "Prev", {100.f, 45.f}, {250.f, 600.f});
     Button nextPageBtn(font, "Next", {100.f, 45.f}, {550.f, 600.f});
     Button listBackBtn(font, "Back", {150.f, 50.f}, {375.f, 600.f});
 
-    // --- STATE MANAGEMENT ---
     AdminState state = DASHBOARD;
-    int focusedTextBox = 0; // 0, 1, 2, 3, 4 based on view
+    int focusedTextBox = 0; 
     int currentPage = 0;
     const int itemsPerPage = 10;
     const int busesPerPage = 6;
 
-    // Data lists for viewing
     vector<pair<string, string>> universitiesList;
     vector<Bus> busesList;
 
@@ -336,7 +327,6 @@ void AdminDashboardGUI::run()
                 }
                 else if (state == ADD_BUS)
                 {
-                    // Focus checking
                     if (mouse.x >= 100 && mouse.x <= 400)
                     {
                         if (mouse.y >= 150 && mouse.y <= 195) { focusedTextBox = 0; busIdBox.setFocused(true); busNameBox.setFocused(false); busUniCodeBox.setFocused(false); busSeatsBox.setFocused(false); busRouteBox.setFocused(false); }
@@ -435,7 +425,6 @@ void AdminDashboardGUI::run()
                 }
             }
 
-            // Keyboard input dispatching
             if (event->is<sf::Event::TextEntered>())
             {
                 if (state == ADD_UNIVERSITY)
@@ -462,7 +451,6 @@ void AdminDashboardGUI::run()
             }
         }
 
-        // --- UPDATE BUTTON HOVERS ---
         if (state == DASHBOARD)
         {
             addUniBtn.update(window);
@@ -500,10 +488,8 @@ void AdminDashboardGUI::run()
             nextPageBtn.update(window);
         }
 
-        // --- DRAW CYCLE ---
         window.clear(sf::Color(35, 45, 70));
 
-        // Draw title
         sf::FloatRect titleBounds = title.getLocalBounds();
         title.setOrigin({titleBounds.position.x + titleBounds.size.x / 2.f, 0.f});
         title.setPosition({450.f, 40.f}); // 900.f / 2 = 450.f

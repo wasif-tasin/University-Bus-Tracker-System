@@ -23,7 +23,6 @@ void GUI::run()
         return;
     }
 
-    // ================= TITLE =================
 
     sf::Text title(font);
     title.setString("UNIVERSITY BUS TRACKER");
@@ -31,16 +30,11 @@ void GUI::run()
     title.setFillColor(sf::Color::White);
     title.setPosition({355.f, 40.f});
 
-    // ================= BUTTONS =================
-
     Button admin(font, "Admin Login", {300.f, 60.f}, {450.f, 180.f});
     Button user(font, "User Login", {300.f, 60.f}, {450.f, 270.f});
     Button reg(font, "Registration", {300.f, 60.f}, {450.f, 360.f});
     Button exit(font, "Exit", {300.f, 60.f}, {450.f, 450.f});
 
-    // ================= BUTTON TEXT =================
-
-    // ================= MAIN LOOP =================
 
     while (window.isOpen())
     {

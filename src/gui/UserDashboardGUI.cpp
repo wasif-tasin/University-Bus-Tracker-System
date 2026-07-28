@@ -19,7 +19,6 @@ static std::string wrapRoute(const std::string& route, float maxWidth, const sf:
     sf::Text tempText(font);
     tempText.setCharacterSize(characterSize);
 
-    // Split route by commas
     std::vector<std::string> stops;
     std::string stop = "";
     for (char c : route)
@@ -105,7 +104,6 @@ void UserDashboardGUI::run()
 
     User user;
 
-    // --- SHARED TEXT ELEMENTS ---
     sf::Text title(font);
     title.setString("USER DASHBOARD");
     title.setCharacterSize(34);
@@ -115,7 +113,6 @@ void UserDashboardGUI::run()
     infoMsg.setCharacterSize(20);
     infoMsg.setFillColor(sf::Color::Yellow);
 
-    // --- DASHBOARD BUTTONS ---
     Button viewUniBtn(font, "View Universities", {300.f, 50.f}, {300.f, 120.f});
     Button selectUniBtn(font, "Select University", {300.f, 50.f}, {300.f, 190.f});
     Button viewAllBusesBtn(font, "View All Buses", {300.f, 50.f}, {300.f, 260.f});
@@ -123,12 +120,10 @@ void UserDashboardGUI::run()
     Button searchStopBtn(font, "Search by Stop Name", {300.f, 50.f}, {300.f, 400.f});
     Button logoutBtn(font, "Logout", {300.f, 50.f}, {300.f, 470.f});
 
-    // --- SHARED BACK / SUBMIT / PAGINATION BUTTONS ---
     Button backBtn(font, "Back", {150.f, 50.f}, {375.f, 600.f});
     Button prevPageBtn(font, "Prev", {100.f, 45.f}, {250.f, 600.f});
     Button nextPageBtn(font, "Next", {100.f, 45.f}, {550.f, 600.f});
 
-    // --- SELECT UNIVERSITY VIEW ---
     sf::Text selectUniLabel(font);
     selectUniLabel.setString("Enter University Code:");
     selectUniLabel.setCharacterSize(18);
@@ -137,7 +132,6 @@ void UserDashboardGUI::run()
     TextBox selectUniCodeBox(font, {300.f, 45.f}, {150.f, 150.f});
     Button selectUniSubmit(font, "Search", {150.f, 45.f}, {480.f, 150.f});
 
-    // --- SEARCH BUS VIEW ---
     sf::Text searchBusLabel(font);
     searchBusLabel.setString("Enter Bus ID:");
     searchBusLabel.setCharacterSize(18);
@@ -146,7 +140,6 @@ void UserDashboardGUI::run()
     TextBox searchBusIdBox(font, {300.f, 45.f}, {150.f, 150.f});
     Button searchBusSubmit(font, "Search", {150.f, 45.f}, {480.f, 150.f});
 
-    // --- SEARCH BY STOP VIEW ---
     sf::Text searchStopLabel(font);
     searchStopLabel.setString("Enter Stop Name:");
     searchStopLabel.setCharacterSize(18);
@@ -155,10 +148,9 @@ void UserDashboardGUI::run()
     TextBox searchStopBox(font, {300.f, 45.f}, {150.f, 150.f});
     Button searchStopSubmit(font, "Search", {150.f, 45.f}, {480.f, 150.f});
 
-    // --- STATE MANAGEMENT ---
     UserState state = USER_DASHBOARD;
     int currentPage = 0;
-    const int itemsPerPage = 8; // slightly smaller so we can fit inputs on screen
+    const int itemsPerPage = 8; 
     const int busesPerPage = 5;
 
     vector<pair<string, string>> universitiesList;
@@ -330,7 +322,6 @@ void UserDashboardGUI::run()
                 }
             }
 
-            // Keyboard inputs
             if (event->is<sf::Event::TextEntered>())
             {
                 if (state == USER_SELECT_UNIVERSITY)
@@ -342,7 +333,6 @@ void UserDashboardGUI::run()
             }
         }
 
-        // --- UPDATE BUTTONS ---
         if (state == USER_DASHBOARD)
         {
             viewUniBtn.update(window);
@@ -363,12 +353,11 @@ void UserDashboardGUI::run()
             else if (state == USER_SEARCH_BY_STOP) searchStopSubmit.update(window);
         }
 
-        // --- DRAW CYCLE ---
-        window.clear(sf::Color(30, 45, 55)); // dark blue-gray user bg
+        window.clear(sf::Color(30, 45, 55)); 
 
         sf::FloatRect titleBounds = title.getLocalBounds();
         title.setOrigin({titleBounds.position.x + titleBounds.size.x / 2.f, 0.f});
-        title.setPosition({450.f, 40.f}); // 900.f / 2 = 450.f
+        title.setPosition({450.f, 40.f}); 
 
         window.draw(title);
 

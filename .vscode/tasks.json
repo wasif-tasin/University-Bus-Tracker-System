@@ -2,11 +2,27 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Build SFML",
+            "label": "Build GUI",
             "type": "shell",
             "command": "g++",
             "args": [
-                "test.cpp",
+                "-std=c++17",
+                "${workspaceFolder}/src/main.cpp",
+                "${workspaceFolder}/src/core/Admin.cpp",
+                "${workspaceFolder}/src/core/User.cpp",
+                "${workspaceFolder}/src/core/Bus.cpp",
+                "${workspaceFolder}/src/gui/GUI.cpp",
+                "${workspaceFolder}/src/gui/Button.cpp",
+                "${workspaceFolder}/src/gui/TextBox.cpp",
+                "${workspaceFolder}/src/gui/AdminLoginGUI.cpp",
+                "${workspaceFolder}/src/gui/AdminDashboardGUI.cpp",
+                "${workspaceFolder}/src/gui/UserLoginGUI.cpp",
+                "${workspaceFolder}/src/gui/UserRegistrationGUI.cpp",
+                "${workspaceFolder}/src/gui/UserDashboardGUI.cpp",
+                "-I",
+                "${workspaceFolder}/src/core",
+                "-I",
+                "${workspaceFolder}/src/gui",
                 "-I",
                 "${workspaceFolder}/SFML/include",
                 "-L",
@@ -15,7 +31,7 @@
                 "-lsfml-window",
                 "-lsfml-system",
                 "-o",
-                "test.exe"
+                "${workspaceFolder}/gui.exe"
             ],
             "group": {
                 "kind": "build",
@@ -23,7 +39,25 @@
             },
             "problemMatcher": [
                 "$gcc"
-            ]
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run GUI",
+            "type": "shell",
+            "command": "${workspaceFolder}/gui.exe",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "Build GUI",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
         }
     ]
 }

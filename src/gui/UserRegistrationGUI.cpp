@@ -118,7 +118,7 @@ void UserRegistrationGUI::run()
         registerBtn.update(window);
         backBtn.update(window);
 
-        window.clear(sf::Color(40, 60, 50)); // Slightly greenish dark background for user flows
+        window.clear(sf::Color(40, 60, 50)); 
 
         window.draw(title);
         window.draw(emailLabel);

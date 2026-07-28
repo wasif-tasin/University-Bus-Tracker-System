@@ -41,7 +41,7 @@ void TextBox::handleEvent(const sf::Event &event)
 
     if (const auto *txt = event.getIf<sf::Event::TextEntered>())
     {
-        if (txt->unicode == 8) // Backspace
+        if (txt->unicode == 8) 
         {
             if (!value.empty())
                 value.pop_back();
@@ -65,13 +65,13 @@ void TextBox::setFocused(bool focused)
     isFocused = focused;
     if (focused)
     {
-        box.setOutlineColor(sf::Color(40, 120, 220)); // Focused blue outline
+        box.setOutlineColor(sf::Color(40, 120, 220)); 
         box.setOutlineThickness(3);
         cursorClock.restart();
     }
     else
     {
-        box.setOutlineColor(sf::Color::Black); // Default black outline
+        box.setOutlineColor(sf::Color::Black); 
         box.setOutlineThickness(2);
     }
 }
