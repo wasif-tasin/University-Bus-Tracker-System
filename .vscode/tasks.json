@@ -7,6 +7,10 @@
             "command": "g++",
             "args": [
                 "-std=c++17",
+                "-g",
+                "-Wall",
+
+                // Source files
                 "${workspaceFolder}/src/main.cpp",
                 "${workspaceFolder}/src/core/Admin.cpp",
                 "${workspaceFolder}/src/core/User.cpp",
@@ -19,17 +23,19 @@
                 "${workspaceFolder}/src/gui/UserLoginGUI.cpp",
                 "${workspaceFolder}/src/gui/UserRegistrationGUI.cpp",
                 "${workspaceFolder}/src/gui/UserDashboardGUI.cpp",
-                "-I",
-                "${workspaceFolder}/src/core",
-                "-I",
-                "${workspaceFolder}/src/gui",
-                "-I",
-                "${workspaceFolder}/SFML/include",
-                "-L",
-                "${workspaceFolder}/SFML/lib",
+
+                // Include paths
+                "-I${workspaceFolder}/src/core",
+                "-I${workspaceFolder}/src/gui",
+                "-I${workspaceFolder}/SFML/include",
+
+                // Library paths and links
+                "-L${workspaceFolder}/SFML/lib",
                 "-lsfml-graphics",
                 "-lsfml-window",
                 "-lsfml-system",
+
+                // Output
                 "-o",
                 "${workspaceFolder}/gui.exe"
             ],
@@ -37,12 +43,11 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": ["$gcc"],
             "presentation": {
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "clear": true
             }
         },
         {
@@ -54,6 +59,7 @@
             },
             "dependsOn": "Build GUI",
             "group": "test",
+            "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
