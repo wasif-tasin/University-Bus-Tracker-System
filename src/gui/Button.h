@@ -25,6 +25,7 @@ private:
     float m_hoverT;
     bool m_hovered;
     bool m_pressed;
+    bool m_focused;
 
     sf::Color idleColor() const;
     sf::Color hoverColor() const;
@@ -45,6 +46,16 @@ public:
     void setLabel(const std::string &label);
     void setStyle(ButtonStyle style);
     void setPosition(sf::Vector2f pos);
+    void setFocused(bool focused);
+    bool isFocused() const;
+
+    // Screens that rebuild their buttons every frame must carry the hover
+    // animation across frames themselves: seed it before update(), read it
+    // back after. Without this the easing restarts from 0 every frame and the
+    // hover never visibly ramps up.
+    void setHoverT(float t);
+    float hoverT() const;
+
     sf::FloatRect getBounds() const;
 };
 

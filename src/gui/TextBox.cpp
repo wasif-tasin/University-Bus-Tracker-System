@@ -94,16 +94,23 @@ void TextBox::insertText(const std::string& s) {
 
 void TextBox::draw(sf::RenderWindow& window) {
     m_glowT = std::clamp(m_glowT + (m_focused ? 0.1f : -0.1f), 0.f, 1.f);
+
+    const float RADIUS = 9.f;
+
+    // Rounded halo that follows the field's own shape (the old one was a
+    // hard-cornered rectangle sitting behind a rounded box).
     if (m_glowT > 0.01f) {
-        sf::RectangleShape glow({m_size.x + 10.f, m_size.y + 10.f});
-        glow.setPosition({m_pos.x - 5.f, m_pos.y - 5.f});
-        glow.setFillColor(sf::Color(59, 130, 246, static_cast<uint8_t>(45 * m_glowT)));
-        window.draw(glow);
+        Theme::drawGlow(window, m_pos, m_size, RADIUS, Theme::ACCENT,
+                        9.f, static_cast<std::uint8_t>(20 * m_glowT), 5);
     }
 
-    sf::Color bgColor     = m_focused ? sf::Color(22, 32, 60) : sf::Color(15, 22, 40);
+    // Inset field: darker than the card it sits on, darkest at the top, so it
+    // reads as carved in rather than floating.
+    sf::Color bgTop = Theme::lerp(sf::Color(11, 17, 33), sf::Color(18, 27, 50), m_glowT);
+    sf::Color bgBot = Theme::lerp(sf::Color(17, 25, 46), sf::Color(26, 38, 68), m_glowT);
     sf::Color borderColor = Theme::lerp(Theme::BORDER_IDLE, Theme::BORDER_FOCUS, m_glowT);
-    Theme::drawRoundedRect(window, m_pos, m_size, 7.f, bgColor, 1.5f, borderColor);
+    Theme::drawRoundedRectV(window, m_pos, m_size, RADIUS, bgTop, bgBot,
+                            1.5f, borderColor);
 
     if (m_passwordMode) {
         sf::Vector2f eyeCenter = Theme::px(
@@ -117,7 +124,7 @@ void TextBox::draw(sf::RenderWindow& window) {
         window.draw(div);
         Theme::drawEyeIcon(window, eyeCenter, 9.f,
                            /*slashed=*/!m_showText,
-                           Theme::TEXT_SECONDARY);
+                           m_showText ? Theme::ACCENT_HOVER : Theme::TEXT_SECONDARY);
     }
 
     bool showPH = m_value.empty() && !m_focused && !m_placeholder.empty();
@@ -134,10 +141,9 @@ void TextBox::draw(sf::RenderWindow& window) {
         if (cursorOn) {
             float caretH = ref.size.y + 6.f;
             float cx     = std::round(txt.getPosition().x + caretOffset(txt, m_caret));
-            sf::RectangleShape caret({1.5f, caretH});
-            caret.setPosition(Theme::px(cx, m_pos.y + (m_size.y - caretH) * 0.5f));
-            caret.setFillColor(Theme::TEXT_PRIMARY);
-            window.draw(caret);
+            float cy     = m_pos.y + (m_size.y - caretH) * 0.5f;
+            Theme::fillRoundedRect(window, Theme::px(cx, cy), {2.f, caretH},
+                                   1.f, Theme::ACCENT_HOVER);
         }
     }
 }

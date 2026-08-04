@@ -18,7 +18,9 @@ enum AdminState { DASHBOARD, VIEW_UNIVERSITIES, ADD_UNIVERSITY, VIEW_BUSES, ADD_
 void AdminDashboardGUI::run()
 {
     sf::RenderWindow window(sf::VideoMode({1100, 720}),
-                            "University Bus Tracker - Admin Dashboard");
+                            "University Bus Tracker - Admin Dashboard",
+                            sf::Style::Default, sf::State::Windowed,
+                            Theme::uiContext());
     window.setFramerateLimit(60);
 
     sf::Font font;
@@ -40,6 +42,10 @@ void AdminDashboardGUI::run()
         showInfo  = true; infoTimer.restart();
     };
     int focusField = 0;
+    // Keyboard focus chains for the two forms: the text fields first, then
+    // Save, then Cancel. Enter walks down the chain and fires the last stop.
+    const int UNI_FIELDS = 2, UNI_SAVE = 2, UNI_CANCEL = 3, UNI_COUNT = 4;
+    const int BUS_FIELDS = 5, BUS_SAVE = 5, BUS_CANCEL = 6, BUS_COUNT = 7;
     const float SW   = 210.f; 
     const float HH   = 60.f;  
     struct NavItem { string label; AdminState st; float y; };
@@ -72,6 +78,47 @@ void AdminDashboardGUI::run()
     busSeatsBox.setPlaceholder("e.g.  40");
     busRouteBox.setPlaceholder("Stop1, Stop2, Stop3...");
 
+    auto saveUniversity = [&]() {
+        string err;
+        if (admin.addUniversity(uniCodeBox.getText(), uniNameBox.getText(), err)) {
+            setInfo("University added.", false);
+            state  = VIEW_UNIVERSITIES;
+            unis   = admin.getUniversities();
+            selIdx = -1;
+            uniCodeBox.clear(); uniNameBox.clear();
+            focusField = 0;
+        } else { setInfo("Error: " + err, true); }
+    };
+    auto cancelUniversity = [&]() {
+        state = VIEW_UNIVERSITIES;
+        unis  = admin.getUniversities();
+        uniCodeBox.clear(); uniNameBox.clear();
+        focusField = 0;
+    };
+    auto saveBus = [&]() {
+        string err;
+        int seats = 0;
+        try { seats = stoi(busSeatsBox.getText()); } catch(...) { seats = -1; }
+        if (admin.addBus(busIdBox.getText(), busNameBox.getText(),
+                        busUniBox.getText(), seats,
+                        busRouteBox.getText(), err)) {
+            setInfo("Bus added.", false);
+            state  = VIEW_BUSES;
+            buses  = admin.getBuses();
+            selIdx = -1;
+            busIdBox.clear(); busNameBox.clear(); busUniBox.clear();
+            busSeatsBox.clear(); busRouteBox.clear();
+            focusField = 0;
+        } else { setInfo("Error: " + err, true); }
+    };
+    auto cancelBus = [&]() {
+        state = VIEW_BUSES;
+        buses = admin.getBuses();
+        busIdBox.clear(); busNameBox.clear(); busUniBox.clear();
+        busSeatsBox.clear(); busRouteBox.clear();
+        focusField = 0;
+    };
+
     while (window.isOpen())
     {
         auto sz  = window.getSize();
@@ -97,6 +144,10 @@ void AdminDashboardGUI::run()
         Button cancelBtn(font, "Cancel", {110.f, 44.f}, {fX + 170.f, HH + 400.f}, ButtonStyle::SECONDARY);
         Button saveBusBtn(font, "Save Bus", {160.f, 44.f}, {fX,        HH + 480.f});
         Button cancelBusBtn(font, "Cancel", {110.f, 44.f},{fX + 170.f, HH + 480.f}, ButtonStyle::SECONDARY);
+        saveBtn.setFocused     (state == ADD_UNIVERSITY && focusField == UNI_SAVE);
+        cancelBtn.setFocused   (state == ADD_UNIVERSITY && focusField == UNI_CANCEL);
+        saveBusBtn.setFocused  (state == ADD_BUS && focusField == BUS_SAVE);
+        cancelBusBtn.setFocused(state == ADD_BUS && focusField == BUS_CANCEL);
 
         Button addBtn(font, "+ Add",  {110.f, 36.f}, {ww - 240.f, (HH - 36.f) * 0.5f});
         Button delBtn(font, "Delete", {110.f, 36.f}, {ww - 120.f, (HH - 36.f) * 0.5f},
@@ -194,21 +245,8 @@ void AdminDashboardGUI::run()
                     if (state == ADD_UNIVERSITY) {
                         if (uniCodeBox.getBounds().contains({mx, my})) { focusField = 0; }
                         if (uniNameBox.getBounds().contains({mx, my})) { focusField = 1; }
-                        if (saveBtn.isClicked(window)) {
-                            string err;
-                            if (admin.addUniversity(uniCodeBox.getText(), uniNameBox.getText(), err)) {
-                                setInfo("University added.", false);
-                                state = VIEW_UNIVERSITIES;
-                                unis  = admin.getUniversities();
-                                selIdx = -1;
-                                uniCodeBox.clear(); uniNameBox.clear();
-                            } else { setInfo("Error: " + err, true); }
-                        }
-                        if (cancelBtn.isClicked(window)) {
-                            state = VIEW_UNIVERSITIES;
-                            unis  = admin.getUniversities();
-                            uniCodeBox.clear(); uniNameBox.clear();
-                        }
+                        if (saveBtn.isClicked(window))   saveUniversity();
+                        if (cancelBtn.isClicked(window)) cancelUniversity();
                     }
                     if (state == ADD_BUS) {
                         if (busIdBox.getBounds().contains({mx,my}))    focusField = 0;
@@ -217,27 +255,8 @@ void AdminDashboardGUI::run()
                         if (busSeatsBox.getBounds().contains({mx,my})) focusField = 3;
                         if (busRouteBox.getBounds().contains({mx,my})) focusField = 4;
 
-                        if (saveBusBtn.isClicked(window)) {
-                            string err;
-                            int seats = 0;
-                            try { seats = stoi(busSeatsBox.getText()); } catch(...) { seats = -1; }
-                            if (admin.addBus(busIdBox.getText(), busNameBox.getText(),
-                                            busUniBox.getText(), seats,
-                                            busRouteBox.getText(), err)) {
-                                setInfo("Bus added.", false);
-                                state  = VIEW_BUSES;
-                                buses  = admin.getBuses();
-                                selIdx = -1;
-                                busIdBox.clear(); busNameBox.clear(); busUniBox.clear();
-                                busSeatsBox.clear(); busRouteBox.clear();
-                            } else { setInfo("Error: " + err, true); }
-                        }
-                        if (cancelBusBtn.isClicked(window)) {
-                            state = VIEW_BUSES;
-                            buses = admin.getBuses();
-                            busIdBox.clear(); busNameBox.clear(); busUniBox.clear();
-                            busSeatsBox.clear(); busRouteBox.clear();
-                        }
+                        if (saveBusBtn.isClicked(window))   saveBus();
+                        if (cancelBusBtn.isClicked(window)) cancelBus();
                     }
                 }
             } 
@@ -245,6 +264,80 @@ void AdminDashboardGUI::run()
                 if (inContent && (state == VIEW_UNIVERSITIES || state == VIEW_BUSES)) {
                     scrollOff -= mw->delta * 36.f;
                     scrollOff  = std::clamp(scrollOff, 0.f, maxScroll);
+                }
+            }
+            if (const auto* kp = event->getIf<sf::Event::KeyPressed>())
+            {
+                using Key = sf::Keyboard::Key;
+
+                if (state == ADD_UNIVERSITY || state == ADD_BUS)
+                {
+                    const bool uni    = (state == ADD_UNIVERSITY);
+                    const int  fields = uni ? UNI_FIELDS : BUS_FIELDS;
+                    const int  count  = uni ? UNI_COUNT  : BUS_COUNT;
+                    const int  saveAt = uni ? UNI_SAVE   : BUS_SAVE;
+                    const int  cancAt = uni ? UNI_CANCEL : BUS_CANCEL;
+                    bool consumed = true;
+
+                    switch (kp->code)
+                    {
+                        case Key::Enter:
+                            // Finish a field -> drop to the next one; on the
+                            // last field Enter presses Save.
+                            if      (focusField <  fields - 1) ++focusField;
+                            else if (focusField == cancAt)     { if (uni) cancelUniversity(); else cancelBus(); }
+                            else                               { if (uni) saveUniversity();   else saveBus();   }
+                            break;
+
+                        case Key::Tab:
+                            focusField = kp->shift ? (focusField + count - 1) % count
+                                                   : (focusField + 1) % count;
+                            break;
+
+                        case Key::Down:
+                            focusField = (focusField + 1) % count;
+                            break;
+
+                        case Key::Up:
+                            focusField = (focusField + count - 1) % count;
+                            break;
+
+                        case Key::Left:
+                            // Only steer between the buttons; inside a field
+                            // the arrows still belong to the caret.
+                            if (focusField == cancAt) focusField = saveAt;
+                            else                      consumed = false;
+                            break;
+
+                        case Key::Right:
+                            if (focusField == saveAt) focusField = cancAt;
+                            else                      consumed = false;
+                            break;
+
+                        case Key::Escape:
+                            if (uni) cancelUniversity(); else cancelBus();
+                            break;
+
+                        default:
+                            consumed = false;
+                            break;
+                    }
+
+                    if (consumed) continue;
+                }
+                else
+                {
+                    if (kp->code == Key::Enter) {
+                        // Enter opens the Add form for whichever list is shown.
+                        if (state == VIEW_UNIVERSITIES) { state = ADD_UNIVERSITY; focusField = 0; selIdx = -1; }
+                        if (state == VIEW_BUSES)        { state = ADD_BUS;        focusField = 0; selIdx = -1; }
+                        continue;
+                    }
+                    if (kp->code == Key::Escape) {
+                        if (state == DASHBOARD) window.close();
+                        else { state = DASHBOARD; selIdx = -1; scrollOff = 0.f; }
+                        continue;
+                    }
                 }
             }
             if (event->is<sf::Event::TextEntered>() ||
@@ -271,6 +364,11 @@ void AdminDashboardGUI::run()
         if (state == ADD_BUS)        { saveBusBtn.update(window); cancelBusBtn.update(window); }
 
         window.clear(Theme::BG_DARK);
+        Theme::drawGradientRect(window, {0.f, 0.f}, {ww, wh}, Theme::BG_DARK, Theme::BG_DEEP);
+        Theme::drawRadialGlow(window, {ww * 0.78f, HH}, std::max(ww, wh) * 0.55f,
+                              Theme::ACCENT, 18);
+        Theme::drawRadialGlow(window, {ww * 0.35f, wh}, std::max(ww, wh) * 0.45f,
+                              Theme::PURPLE, 16);
 
         if (state == DASHBOARD) {
           
@@ -339,11 +437,10 @@ void AdminDashboardGUI::run()
         }
         else if (state == ADD_UNIVERSITY) {
             // Form card
-            Theme::drawCard(window, {SW + 20.f, HH + 20.f}, {CW - 40.f, 440.f},
-                            Theme::BG_CARD, 12.f);
-            sf::RectangleShape formAccent({CW - 40.f, 4.f});
-            formAccent.setPosition({SW + 20.f, HH + 20.f});
-            formAccent.setFillColor(Theme::ACCENT); window.draw(formAccent);
+            Theme::drawCardElevated(window, {SW + 20.f, HH + 20.f}, {CW - 40.f, 440.f},
+                                    Theme::BG_CARD, 14.f, 20.f, 14);
+            Theme::fillRoundedRectV(window, {SW + 38.f, HH + 21.f}, {CW - 76.f, 3.f}, 1.5f,
+                                    Theme::ACCENT_CYAN, Theme::ACCENT);
 
             auto drawLbl = [&](const string& s, float x, float y) {
                 Theme::drawText(window, font, s, Theme::Type::LABEL,
@@ -408,11 +505,10 @@ void AdminDashboardGUI::run()
             }
         }
         else if (state == ADD_BUS) {
-            Theme::drawCard(window, {SW + 20.f, HH + 20.f}, {CW - 40.f, 520.f},
-                            Theme::BG_CARD, 12.f);
-            sf::RectangleShape formAccent2({CW - 40.f, 4.f});
-            formAccent2.setPosition({SW + 20.f, HH + 20.f});
-            formAccent2.setFillColor(Theme::PURPLE); window.draw(formAccent2);
+            Theme::drawCardElevated(window, {SW + 20.f, HH + 20.f}, {CW - 40.f, 520.f},
+                                    Theme::BG_CARD, 14.f, 20.f, 14);
+            Theme::fillRoundedRectV(window, {SW + 38.f, HH + 21.f}, {CW - 76.f, 3.f}, 1.5f,
+                                    Theme::PURPLE_HOVER, Theme::PURPLE);
 
             auto drawLbl = [&](const string& s, float x, float y) {
                 Theme::drawText(window, font, s, Theme::Type::LABEL,
@@ -434,20 +530,14 @@ void AdminDashboardGUI::run()
         }
 
         {
-            sf::RectangleShape sbg({SW, wh});
-            sbg.setFillColor(Theme::BG_SIDEBAR);
-            window.draw(sbg);
+            Theme::drawSidebarBackdrop(window, SW, wh, Theme::ACCENT);
 
-            sf::RectangleShape sborder({1.f, wh});
-            sborder.setPosition({SW - 1.f, 0.f});
-            sborder.setFillColor(Theme::BORDER_IDLE);
-            window.draw(sborder);
             Theme::drawTextHCentered(window, font, "Bus Tracker", Theme::Type::SUBTITLE,
-                                     Theme::ACCENT, SW * 0.5f, 14.f, sf::Text::Bold);
+                                     Theme::ACCENT_HOVER, SW * 0.5f, 14.f, sf::Text::Bold);
             Theme::drawTextHCentered(window, font, "ADMIN", Theme::Type::CAPTION,
                                      Theme::TEXT_MUTED, SW * 0.5f, 38.f, sf::Text::Bold);
 
-            Theme::drawSeparator(window, 0.f, 70.f, SW);
+            Theme::drawSeparatorSoft(window, 10.f, 70.f, SW - 20.f);
 
             for (auto& nav : navItems) {
                 bool active = (state == nav.st) ||
@@ -455,44 +545,24 @@ void AdminDashboardGUI::run()
                               (nav.st == VIEW_BUSES        && state == ADD_BUS);
                 bool hov    = mx < SW && my >= nav.y && my < nav.y + 42.f;
 
-                sf::Color itemBg = active ? Theme::SIDEBAR_SELECTED
-                                 : hov   ? Theme::SIDEBAR_HOVER
-                                 : sf::Color(0,0,0,0);
-                if (active || hov) {
-                    sf::RectangleShape ib({SW, 42.f});
-                    ib.setPosition({0.f, nav.y});
-                    ib.setFillColor(itemBg);
-                    window.draw(ib);
-                }
-                if (active)
-                    Theme::drawAccentBar(window, 0.f, nav.y, 42.f, Theme::ACCENT);
+                Theme::drawNavItem(window, SW, nav.y, 42.f, active, hov, Theme::ACCENT);
                 Theme::drawTextVCentered(window, font, nav.label, Theme::Type::META,
                                          active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
-                                         18.f, nav.y, 42.f,
+                                         22.f, nav.y, 42.f,
                                          active ? sf::Text::Bold : sf::Text::Regular);
             }
 
             bool logHov = mx < SW && my >= wh - 52.f && my < wh - 12.f;
-            if (logHov) {
-                sf::RectangleShape lb({SW, 40.f});
-                lb.setPosition({0.f, wh - 52.f}); lb.setFillColor(Theme::SIDEBAR_HOVER);
-                window.draw(lb);
-            }
+            if (logHov)
+                Theme::fillRoundedRect(window, {8.f, wh - 52.f}, {SW - 18.f, 40.f}, 10.f,
+                                       Theme::withAlpha(Theme::DANGER, 45));
             Theme::drawTextVCentered(window, font, "Logout", Theme::Type::META,
-                                     Theme::DANGER_HOVER, 18.f, wh - 52.f, 40.f,
+                                     Theme::DANGER_HOVER, 22.f, wh - 52.f, 40.f,
                                      sf::Text::Bold);
-            Theme::drawSeparator(window, 0.f, wh - 56.f, SW);
+            Theme::drawSeparatorSoft(window, 10.f, wh - 56.f, SW - 20.f);
         }
         {
-            sf::RectangleShape hbg({ww - SW, HH});
-            hbg.setPosition({SW, 0.f});
-            hbg.setFillColor(Theme::BG_HEADER);
-            window.draw(hbg);
-
-            sf::RectangleShape hline({ww - SW, 1.5f});
-            hline.setPosition({SW, HH - 1.5f});
-            hline.setFillColor(Theme::ACCENT);
-            window.draw(hline);
+            Theme::drawHeaderBar(window, SW, ww - SW, HH, Theme::ACCENT, Theme::PURPLE);
 
             string pageTitle = "Dashboard";
             if (state == VIEW_UNIVERSITIES || state == ADD_UNIVERSITY) pageTitle = "Universities";

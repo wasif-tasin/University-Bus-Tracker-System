@@ -59,7 +59,9 @@ enum UserState {
 void UserDashboardGUI::run()
 {
     sf::RenderWindow window(sf::VideoMode({1100, 720}),
-                            "University Bus Tracker - User Dashboard");
+                            "University Bus Tracker - User Dashboard",
+                            sf::Style::Default, sf::State::Windowed,
+                            Theme::uiContext());
     window.setFramerateLimit(60);
 
     sf::Font font;
@@ -104,6 +106,24 @@ void UserDashboardGUI::run()
     uniCodeBox.setPlaceholder("Enter university code (e.g. BUET)");
     busIdBox.setPlaceholder  ("Enter Bus ID");
     stopBox.setPlaceholder   ("Enter stop name");
+
+    // Each search view has exactly one field and one Search button, so Enter
+    // in the field runs the search -- no mouse needed.
+    auto runSearch = [&]() {
+        scrollOff = 0.f;
+        if (state == USER_SELECT_UNIVERSITY) {
+            buses = user.getBusesForUniversity(uniCodeBox.getText());
+            if (buses.empty()) setInfo("No buses found for: " + uniCodeBox.getText(), true);
+        }
+        else if (state == USER_SEARCH_BUS) {
+            buses = user.searchBus(busIdBox.getText());
+            if (buses.empty()) setInfo("Bus not found: " + busIdBox.getText(), true);
+        }
+        else if (state == USER_SEARCH_BY_STOP) {
+            buses = user.searchByStop(stopBox.getText());
+            if (buses.empty()) setInfo("No buses pass through: " + stopBox.getText(), true);
+        }
+    };
 
 
     while (window.isOpen())
@@ -161,21 +181,12 @@ void UserDashboardGUI::run()
                 }
 
                 if (inContent) {
-                    if (state == USER_SELECT_UNIVERSITY && srchUniBtn.isClicked(window)) {
-                        buses = user.getBusesForUniversity(uniCodeBox.getText());
-                        scrollOff = 0.f;
-                        if (buses.empty()) setInfo("No buses found for: " + uniCodeBox.getText(), true);
-                    }
-                    if (state == USER_SEARCH_BUS && srchBusBtn.isClicked(window)) {
-                        buses = user.searchBus(busIdBox.getText());
-                        scrollOff = 0.f;
-                        if (buses.empty()) setInfo("Bus not found: " + busIdBox.getText(), true);
-                    }
-                    if (state == USER_SEARCH_BY_STOP && srchStopBtn.isClicked(window)) {
-                        buses = user.searchByStop(stopBox.getText());
-                        scrollOff = 0.f;
-                        if (buses.empty()) setInfo("No buses pass through: " + stopBox.getText(), true);
-                    }
+                    if (state == USER_SELECT_UNIVERSITY && srchUniBtn.isClicked(window))
+                        runSearch();
+                    if (state == USER_SEARCH_BUS && srchBusBtn.isClicked(window))
+                        runSearch();
+                    if (state == USER_SEARCH_BY_STOP && srchStopBtn.isClicked(window))
+                        runSearch();
                 }
             }
 
@@ -183,6 +194,28 @@ void UserDashboardGUI::run()
                 if (inContent) {
                     scrollOff -= mw->delta * 36.f;
                     scrollOff  = std::clamp(scrollOff, 0.f, maxScroll);
+                }
+            }
+
+            if (const auto* kp = event->getIf<sf::Event::KeyPressed>())
+            {
+                using Key = sf::Keyboard::Key;
+                bool searching = (state == USER_SELECT_UNIVERSITY ||
+                                  state == USER_SEARCH_BUS        ||
+                                  state == USER_SEARCH_BY_STOP);
+
+                if (kp->code == Key::Enter) {
+                    if (searching) runSearch();
+                    continue;
+                }
+                if (kp->code == Key::Escape) {
+                    if (state == USER_DASHBOARD) window.close();
+                    else {
+                        state     = USER_DASHBOARD;
+                        scrollOff = 0.f;
+                        buses.clear();
+                    }
+                    continue;
                 }
             }
 
@@ -200,6 +233,11 @@ void UserDashboardGUI::run()
         srchStopBtn.update(window);
 
         window.clear(Theme::BG_DARK);
+        Theme::drawGradientRect(window, {0.f, 0.f}, {ww, wh}, Theme::BG_DARK, Theme::BG_DEEP);
+        Theme::drawRadialGlow(window, {ww * 0.78f, HH}, std::max(ww, wh) * 0.55f,
+                              Theme::ACCENT, 18);
+        Theme::drawRadialGlow(window, {ww * 0.35f, wh}, std::max(ww, wh) * 0.45f,
+                              Theme::PURPLE, 16);
 
         auto drawBusCard = [&](Bus b, float cx, float cy,
                                float cardW, bool hov, bool includeUni)
@@ -382,57 +420,38 @@ void UserDashboardGUI::run()
         }
 
         {
-            sf::RectangleShape sbg({SW, wh});
-            sbg.setFillColor(Theme::BG_SIDEBAR); window.draw(sbg);
-            sf::RectangleShape sbd({1.f, wh});
-            sbd.setPosition({SW - 1.f, 0.f});
-            sbd.setFillColor(Theme::BORDER_IDLE); window.draw(sbd);
+            Theme::drawSidebarBackdrop(window, SW, wh, Theme::ACCENT);
 
             Theme::drawTextHCentered(window, font, "Bus Tracker", Theme::Type::SUBTITLE,
-                                     Theme::ACCENT, SW * 0.5f, 14.f, sf::Text::Bold);
+                                     Theme::ACCENT_HOVER, SW * 0.5f, 14.f, sf::Text::Bold);
             Theme::drawTextHCentered(window, font, "USER", Theme::Type::CAPTION,
                                      Theme::TEXT_MUTED, SW * 0.5f, 38.f, sf::Text::Bold);
 
-            Theme::drawSeparator(window, 0.f, 70.f, SW);
+            Theme::drawSeparatorSoft(window, 10.f, 70.f, SW - 20.f);
 
             for (auto& nav : navItems) {
                 bool active = (state == nav.st);
                 bool hov    = mx < SW && my >= nav.y && my < nav.y + 42.f;
-                sf::Color ibg = active ? Theme::SIDEBAR_SELECTED
-                              : hov   ? Theme::SIDEBAR_HOVER
-                              : sf::Color(0,0,0,0);
-                if (active || hov) {
-                    sf::RectangleShape ib({SW, 42.f});
-                    ib.setPosition({0.f, nav.y}); ib.setFillColor(ibg);
-                    window.draw(ib);
-                }
-                if (active) Theme::drawAccentBar(window, 0.f, nav.y, 42.f, Theme::ACCENT);
 
+                Theme::drawNavItem(window, SW, nav.y, 42.f, active, hov, Theme::ACCENT);
                 Theme::drawTextVCentered(window, font, nav.label, Theme::Type::META,
                                          active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
-                                         18.f, nav.y, 42.f,
+                                         22.f, nav.y, 42.f,
                                          active ? sf::Text::Bold : sf::Text::Regular);
             }
 
             bool lh = mx < SW && my >= wh - 52.f && my < wh - 12.f;
-            if (lh) {
-                sf::RectangleShape lb({SW, 40.f});
-                lb.setPosition({0.f, wh - 52.f}); lb.setFillColor(Theme::SIDEBAR_HOVER);
-                window.draw(lb);
-            }
-            Theme::drawSeparator(window, 0.f, wh - 56.f, SW);
+            if (lh)
+                Theme::fillRoundedRect(window, {8.f, wh - 52.f}, {SW - 18.f, 40.f}, 10.f,
+                                       Theme::withAlpha(Theme::DANGER, 45));
+            Theme::drawSeparatorSoft(window, 10.f, wh - 56.f, SW - 20.f);
             Theme::drawTextVCentered(window, font, "Logout", Theme::Type::META,
-                                     Theme::DANGER_HOVER, 18.f, wh - 52.f, 40.f,
+                                     Theme::DANGER_HOVER, 22.f, wh - 52.f, 40.f,
                                      sf::Text::Bold);
         }
 
         {
-            sf::RectangleShape hbg({ww - SW, HH});
-            hbg.setPosition({SW, 0.f}); hbg.setFillColor(Theme::BG_HEADER);
-            window.draw(hbg);
-            sf::RectangleShape hl({ww - SW, 1.5f});
-            hl.setPosition({SW, HH - 1.5f}); hl.setFillColor(Theme::ACCENT);
-            window.draw(hl);
+            Theme::drawHeaderBar(window, SW, ww - SW, HH, Theme::ACCENT, Theme::PURPLE);
 
             string pageTitle = "Dashboard";
             if (state == USER_VIEW_UNIVERSITIES) pageTitle = "Universities";
