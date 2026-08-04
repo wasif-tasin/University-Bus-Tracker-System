@@ -15,8 +15,7 @@ void AdminLoginGUI::run()
     window.setFramerateLimit(60);
 
     sf::Font font;
-    if (!font.openFromFile("assets/Inter-Regular.ttf")) return;
-    Theme::configureFont(font);
+    if (!Theme::loadUIFont(font)) return;
 
     Admin admin;
 
@@ -24,17 +23,19 @@ void AdminLoginGUI::run()
     bool focusUser = true;
 
     // ── Layout (fixed window — compute once) ──────────────────────────
+    // Card height is even so the centred card lands on integer pixels; a
+    // half-pixel origin here would soften every glyph inside it.
     const float ww = 720.f, wh = 500.f;
     const float cW = std::min(480.f, ww - 60.f);
-    const float cH = 355.f;
-    const float cX = (ww - cW) * 0.5f;
-    const float cY = (wh - cH) * 0.5f;
+    const float cH = 376.f;
+    const float cX = std::round((ww - cW) * 0.5f);
+    const float cY = std::round((wh - cH) * 0.5f);
     const float fX = cX + 28.f;
     const float fW = cW - 56.f;
 
     // ── TextBox objects live OUTSIDE the game loop so m_value persists ─
-    TextBox userBox(font, {fW, 46.f}, {fX, cY + 118.f});
-    TextBox passBox(font, {fW, 46.f}, {fX, cY + 210.f});
+    TextBox userBox(font, {fW, 46.f}, {fX, cY + 140.f});
+    TextBox passBox(font, {fW, 46.f}, {fX, cY + 220.f});
     userBox.setPlaceholder("Enter username");
     passBox.setPlaceholder("Enter password");
     passBox.setPasswordMode(true);
@@ -47,15 +48,15 @@ void AdminLoginGUI::run()
         passBox.setFocused(!focusUser);
 
         // Buttons are stateless — fine to construct each frame
-        Button loginBtn(font, "Login",  {fW * 0.58f, 46.f}, {fX,               cY + 280.f});
-        Button backBtn (font, "< Back", {fW * 0.36f, 46.f}, {fX + fW * 0.62f,  cY + 280.f},
+        Button loginBtn(font, "Login",  {fW * 0.58f, 46.f}, {fX,               cY + 288.f});
+        Button backBtn (font, "< Back", {fW * 0.36f, 46.f}, {fX + fW * 0.62f,  cY + 288.f},
                         ButtonStyle::SECONDARY);
 
         // ── Events ───────────────────────────────────────────────────
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
-
+            Theme::syncViewToWindow(window, *event);
             if (event->is<sf::Event::MouseButtonPressed>())
             {
                 auto mp = sf::Mouse::getPosition(window);
@@ -81,7 +82,8 @@ void AdminLoginGUI::run()
                 passBox.handleEvent(*event);
             }
 
-            if (event->is<sf::Event::TextEntered>()) {
+            if (event->is<sf::Event::TextEntered>() ||
+                event->is<sf::Event::KeyPressed>()) {
                 if (focusUser) userBox.handleEvent(*event);
                 else           passBox.handleEvent(*event);
             }
@@ -106,28 +108,18 @@ void AdminLoginGUI::run()
                               22.f, Theme::withAlpha(Theme::PURPLE, 55),
                               "A", Theme::PURPLE, 18);
 
-        sf::Text title(font);
-        title.setString("Admin Login");
-        title.setCharacterSize(24);
-        title.setFillColor(Theme::TEXT_PRIMARY);
-        sf::FloatRect tb = title.getLocalBounds();
-        title.setOrigin({tb.position.x + tb.size.x * 0.5f,
-                         tb.position.y + tb.size.y * 0.5f});
-        title.setPosition(Theme::px(cX + cW * 0.5f, cY + 76.f));
-        window.draw(title);
+        Theme::drawTextHCentered(window, font, "Admin Login", Theme::Type::TITLE,
+                                 Theme::TEXT_PRIMARY, cX + cW * 0.5f, cY + 68.f,
+                                 sf::Text::Bold);
 
-        Theme::drawSeparator(window, cX + 28.f, cY + 97.f, cW - 56.f);
+        Theme::drawSeparator(window, cX + 28.f, cY + 106.f, cW - 56.f);
 
         auto drawLabel = [&](const std::string& s, float x, float y) {
-            sf::Text lbl(font);
-            lbl.setString(s);
-            lbl.setCharacterSize(11);
-            lbl.setFillColor(Theme::TEXT_SECONDARY);
-            lbl.setPosition(Theme::px(x, y));
-            window.draw(lbl);
+            Theme::drawText(window, font, s, Theme::Type::LABEL,
+                            Theme::TEXT_MUTED, {x, y}, sf::Text::Bold);
         };
-        drawLabel("USERNAME", fX, cY + 103.f);
-        drawLabel("PASSWORD", fX, cY + 194.f);
+        drawLabel("USERNAME", fX, cY + 120.f);
+        drawLabel("PASSWORD", fX, cY + 200.f);
 
         userBox.draw(window);
         passBox.draw(window);
@@ -135,12 +127,9 @@ void AdminLoginGUI::run()
         backBtn.draw(window);
 
         if (!errorText.empty()) {
-            sf::Text err(font);
-            err.setString("  " + errorText);
-            err.setCharacterSize(13);
-            err.setFillColor(Theme::DANGER);
-            err.setPosition({fX, cY + 336.f});
-            window.draw(err);
+            Theme::drawText(window, font, errorText, Theme::Type::META,
+                            Theme::DANGER_HOVER, {fX + 2.f, cY + 346.f},
+                            sf::Text::Bold);
         }
 
         window.display();

@@ -14,10 +14,9 @@ void GUI::run()
     window.setFramerateLimit(60);
 
     sf::Font font;
-    if (!font.openFromFile("assets/Inter-Regular.ttf")) {
+    if (!Theme::loadUIFont(font)) {
         return;
     }
-    Theme::configureFont(font);
 
     float card1HoverT = 0.f;
     float card2HoverT = 0.f;
@@ -59,7 +58,7 @@ void GUI::run()
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
-
+            Theme::syncViewToWindow(window, *event);
             if (event->is<sf::Event::MouseButtonPressed>())
             {
                 if (c1h) {
@@ -106,128 +105,71 @@ void GUI::run()
 
         // Left panel — app name
         {
-            sf::Text t1(font); t1.setString("University");
-            t1.setCharacterSize(28); t1.setFillColor(Theme::TEXT_PRIMARY);
-            sf::FloatRect b = t1.getLocalBounds();
-            t1.setOrigin({b.position.x + b.size.x * 0.5f, 0.f});
-            t1.setPosition({iconCX, iconCY + 56.f});
-            window.draw(t1);
-
-            sf::Text t2(font); t2.setString("Bus Tracker");
-            t2.setCharacterSize(28); t2.setFillColor(Theme::ACCENT);
-            sf::FloatRect b2 = t2.getLocalBounds();
-            t2.setOrigin({b2.position.x + b2.size.x * 0.5f, 0.f});
-            t2.setPosition({iconCX, iconCY + 92.f});
-            window.draw(t2);
+            Theme::drawTextHCentered(window, font, "University", Theme::Type::DISPLAY,
+                                     Theme::TEXT_PRIMARY, iconCX, iconCY + 56.f,
+                                     sf::Text::Bold);
+            Theme::drawTextHCentered(window, font, "Bus Tracker", Theme::Type::DISPLAY,
+                                     Theme::ACCENT, iconCX, iconCY + 94.f,
+                                     sf::Text::Bold);
         }
 
-        // Left panel — tagline
+        // Left panel — tagline. Drawn line by line so both lines are centred,
+        // not just the block, with a roomier line height.
         {
-            sf::Text tag(font);
-            tag.setString("Your campus transport,\nsimplified.");
-            tag.setCharacterSize(13);
-            tag.setFillColor(Theme::TEXT_MUTED);
-            sf::FloatRect b = tag.getLocalBounds();
-            tag.setOrigin({b.position.x + b.size.x * 0.5f, 0.f});
-            tag.setPosition({iconCX, iconCY + 136.f});
-            window.draw(tag);
+            Theme::drawTextHCentered(window, font, "Your campus transport,",
+                                     Theme::Type::META, Theme::TEXT_SECONDARY,
+                                     iconCX, iconCY + 142.f);
+            Theme::drawTextHCentered(window, font, "simplified.",
+                                     Theme::Type::META, Theme::TEXT_SECONDARY,
+                                     iconCX, iconCY + 164.f);
         }
 
         Theme::drawSeparator(window, leftW * 0.15f, wh - 42.f, leftW * 0.7f);
         {
-            sf::Text ver(font); ver.setString("v1.0  |  SFML 3");
-            ver.setCharacterSize(11); ver.setFillColor(Theme::TEXT_MUTED);
-            sf::FloatRect b = ver.getLocalBounds();
-            ver.setOrigin({b.position.x + b.size.x * 0.5f, 0.f});
-            ver.setPosition({iconCX, wh - 30.f});
-            window.draw(ver);
+            Theme::drawTextHCentered(window, font, "v1.0  |  SFML 3", Theme::Type::CAPTION,
+                                     Theme::TEXT_MUTED, iconCX, wh - 30.f);
         }
 
         // Right panel — "Select a Panel" prompt
         {
-            sf::Text prompt(font);
-            prompt.setString("Select a Panel");
-            prompt.setCharacterSize(14);
-            prompt.setFillColor(Theme::TEXT_MUTED);
-            sf::FloatRect b = prompt.getLocalBounds();
-            prompt.setOrigin({b.position.x + b.size.x * 0.5f, 0.f});
-            prompt.setPosition({rightX + rightW * 0.5f, card1Y - 36.f});
-            window.draw(prompt);
+            Theme::drawTextHCentered(window, font, "SELECT A PANEL", Theme::Type::LABEL,
+                                     Theme::TEXT_MUTED, rightX + rightW * 0.5f,
+                                     card1Y - 38.f, sf::Text::Bold);
         }
 
-        // ── Card 1: User Panel ───────────────────────────────────────────
+        // ── Panel cards ──────────────────────────────────────────────────
+        // Shared so the two cards can't drift apart typographically.
+        auto drawPanelCard = [&](float y, float hoverT, sf::Color accent,
+                                 const std::string& letter,
+                                 const std::string& title,
+                                 const std::string& subtitle)
         {
-            sf::Color bg = Theme::lerp(Theme::BG_CARD, Theme::BG_CARD_HOVER, card1HoverT);
-            Theme::drawCard(window, {cardX, card1Y}, {cardW, cardH}, bg, 12.f);
-            // Left accent
-            Theme::drawAccentBar(window, cardX, card1Y, cardH, Theme::ACCENT, 4.f);
-            // Icon
-            Theme::drawIconCircle(window, font,
-                                  {cardX + 52.f, card1Y + cardH * 0.5f},
-                                  26.f,
-                                  Theme::withAlpha(Theme::ACCENT, 45), "U",
-                                  Theme::ACCENT, 20);
-            // Title
-            sf::Text ct(font); ct.setString("User Panel");
-            ct.setCharacterSize(20); ct.setFillColor(Theme::TEXT_PRIMARY);
-            sf::FloatRect b = ct.getLocalBounds();
-            ct.setPosition({cardX + 96.f,
-                            card1Y + cardH * 0.5f - b.size.y - b.position.y - 10.f});
-            window.draw(ct);
-            // Subtitle
-            sf::Text cs(font); cs.setString("Login or register to browse bus routes");
-            cs.setCharacterSize(13); cs.setFillColor(Theme::TEXT_SECONDARY);
-            sf::FloatRect bs = cs.getLocalBounds();
-            cs.setPosition({cardX + 96.f,
-                            card1Y + cardH * 0.5f - bs.position.y + 4.f});
-            window.draw(cs);
-            // Arrow
-            sf::Text ar(font); ar.setString(">");
-            ar.setCharacterSize(18);
-            ar.setFillColor(Theme::lerp(Theme::TEXT_MUTED, Theme::ACCENT, card1HoverT));
-            sf::FloatRect ba = ar.getLocalBounds();
-            ar.setOrigin({ba.position.x + ba.size.x * 0.5f,
-                          ba.position.y + ba.size.y * 0.5f});
-            ar.setPosition({cardX + cardW - 28.f, card1Y + cardH * 0.5f});
-            window.draw(ar);
-        }
+            sf::Color bg = Theme::lerp(Theme::BG_CARD, Theme::BG_CARD_HOVER, hoverT);
+            Theme::drawCard(window, {cardX, y}, {cardW, cardH}, bg, 12.f);
+            Theme::drawAccentBar(window, cardX, y, cardH, accent, 4.f);
+            Theme::drawIconCircle(window, font, {cardX + 52.f, y + cardH * 0.5f},
+                                  26.f, Theme::withAlpha(accent, 45), letter,
+                                  accent, Theme::Type::HEADING);
 
-        // ── Card 2: Admin Panel ──────────────────────────────────────────
-        {
-            sf::Color bg = Theme::lerp(Theme::BG_CARD, Theme::BG_CARD_HOVER, card2HoverT);
-            Theme::drawCard(window, {cardX, card2Y}, {cardW, cardH}, bg, 12.f);
-            // Left accent (purple)
-            Theme::drawAccentBar(window, cardX, card2Y, cardH, Theme::PURPLE, 4.f);
-            // Icon
-            Theme::drawIconCircle(window, font,
-                                  {cardX + 52.f, card2Y + cardH * 0.5f},
-                                  26.f,
-                                  Theme::withAlpha(Theme::PURPLE, 45), "A",
-                                  Theme::PURPLE, 20);
-            // Title
-            sf::Text ct(font); ct.setString("Admin Panel");
-            ct.setCharacterSize(20); ct.setFillColor(Theme::TEXT_PRIMARY);
-            sf::FloatRect b = ct.getLocalBounds();
-            ct.setPosition({cardX + 96.f,
-                            card2Y + cardH * 0.5f - b.size.y - b.position.y - 10.f});
-            window.draw(ct);
-            // Subtitle
-            sf::Text cs(font); cs.setString("Manage universities, buses and routes");
-            cs.setCharacterSize(13); cs.setFillColor(Theme::TEXT_SECONDARY);
-            sf::FloatRect bs = cs.getLocalBounds();
-            cs.setPosition({cardX + 96.f,
-                            card2Y + cardH * 0.5f - bs.position.y + 4.f});
-            window.draw(cs);
-            // Arrow
-            sf::Text ar(font); ar.setString(">");
-            ar.setCharacterSize(18);
-            ar.setFillColor(Theme::lerp(Theme::TEXT_MUTED, Theme::PURPLE, card2HoverT));
-            sf::FloatRect ba = ar.getLocalBounds();
-            ar.setOrigin({ba.position.x + ba.size.x * 0.5f,
-                          ba.position.y + ba.size.y * 0.5f});
-            ar.setPosition({cardX + cardW - 28.f, card2Y + cardH * 0.5f});
-            window.draw(ar);
-        }
+            // Title above, subtitle below, with a real gap between them —
+            // the two used to sit almost on top of each other.
+            Theme::drawText(window, font, title, Theme::Type::TITLE,
+                            Theme::TEXT_PRIMARY,
+                            {cardX + 96.f, y + cardH * 0.5f - 34.f}, sf::Text::Bold);
+            Theme::drawText(window, font, subtitle, Theme::Type::META,
+                            Theme::TEXT_SECONDARY,
+                            {cardX + 96.f, y + cardH * 0.5f + 8.f});
+
+            Theme::drawCenteredText(window, font, ">", Theme::Type::HEADING,
+                                    Theme::lerp(Theme::TEXT_MUTED, accent, hoverT),
+                                    {{cardX + cardW - 44.f, y + cardH * 0.5f - 16.f},
+                                     {32.f, 32.f}}, sf::Text::Bold);
+        };
+
+        drawPanelCard(card1Y, card1HoverT, Theme::ACCENT, "U", "User Panel",
+                      "Login or register to browse bus routes");
+        drawPanelCard(card2Y, card2HoverT, Theme::PURPLE, "A", "Admin Panel",
+                      "Manage universities, buses and routes");
 
         exitBtn.draw(window);
         window.display();

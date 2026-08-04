@@ -15,8 +15,7 @@ void UserPanelGUI::run()
     window.setFramerateLimit(60);
 
     sf::Font font;
-    if (!font.openFromFile("assets/Inter-Regular.ttf")) return;
-    Theme::configureFont(font);
+    if (!Theme::loadUIFont(font)) return;
 
     while (window.isOpen())
     {
@@ -44,7 +43,7 @@ void UserPanelGUI::run()
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
-
+            Theme::syncViewToWindow(window, *event);
             if (event->is<sf::Event::MouseButtonPressed>())
             {
                 if (loginBtn.isClicked(window)) {
@@ -89,17 +88,11 @@ void UserPanelGUI::run()
                               Theme::ACCENT, 18);
 
         // Title
-        sf::Text title(font);
-        title.setString("User Panel");
-        title.setCharacterSize(20);
-        title.setFillColor(Theme::TEXT_PRIMARY);
-        sf::FloatRect tb = title.getLocalBounds();
-        title.setOrigin({tb.position.x + tb.size.x * 0.5f,
-                         tb.position.y + tb.size.y * 0.5f});
-        title.setPosition({cardX + cardW * 0.5f, cardY + 78.f});
-        window.draw(title);
+        Theme::drawTextHCentered(window, font, "User Panel", Theme::Type::TITLE,
+                                 Theme::TEXT_PRIMARY, cardX + cardW * 0.5f,
+                                 cardY + 68.f, sf::Text::Bold);
 
-        Theme::drawSeparator(window, cardX + 30.f, cardY + 97.f, cardW - 60.f);
+        Theme::drawSeparator(window, cardX + 30.f, cardY + 100.f, cardW - 60.f);
 
         loginBtn.draw(window);
         regBtn.draw(window);

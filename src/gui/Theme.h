@@ -5,6 +5,7 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace Theme {
 
@@ -31,12 +32,29 @@ inline const sf::Color PURPLE           = sf::Color(124, 58,  237);
 inline const sf::Color PURPLE_HOVER     = sf::Color(139, 92,  246);
 inline const sf::Color PURPLE_DIM       = sf::Color(124, 58,  237,  50);
 
-inline const sf::Color TEXT_PRIMARY     = sf::Color(241, 245, 249);
-inline const sf::Color TEXT_SECONDARY   = sf::Color(148, 163, 184);
-inline const sf::Color TEXT_MUTED       = sf::Color(100, 116, 139);
+// ─── Text hierarchy ─────────────────────────────────────────────────────────
+// Four deliberate steps, brightest first. Nothing dimmer than TEXT_MUTED is
+// used for real content — faded low-contrast grey is what made the old UI
+// hard to read.
+inline const sf::Color TEXT_PRIMARY     = sf::Color(255, 255, 255); // #FFFFFF titles
+inline const sf::Color TEXT_SECONDARY   = sf::Color(215, 220, 231); // #D7DCE7 university, seats
+inline const sf::Color TEXT_ROUTE       = sf::Color(184, 192, 212); // #B8C0D4 route text
+inline const sf::Color TEXT_MUTED       = sf::Color(154, 164, 181); // #9AA4B5 minor labels
 
 inline const sf::Color BORDER_IDLE      = sf::Color(51,  65,  85 );
 inline const sf::Color BORDER_FOCUS     = sf::Color(59,  130, 246);
+
+// ─── Badge (short-code chip) colours ────────────────────────────────────────
+// Opaque on purpose: a translucent chip changes contrast whenever the card
+// behind it is hovered or selected. These stay ~8:1 against their label in
+// every card state.
+inline const sf::Color BADGE_UNI_BG     = sf::Color(37,  71,  132);
+inline const sf::Color BADGE_UNI_TEXT   = sf::Color(235, 244, 255);
+inline const sf::Color BADGE_UNI_EDGE   = sf::Color(74,  126, 208);
+
+inline const sf::Color BADGE_BUS_BG     = sf::Color(74,  48,  130);
+inline const sf::Color BADGE_BUS_TEXT   = sf::Color(233, 224, 255);
+inline const sf::Color BADGE_BUS_EDGE   = sf::Color(133, 96,  222);
 
 inline const sf::Color ITEM_BG          = sf::Color(20,  30,  55 );
 inline const sf::Color ITEM_HOVER       = sf::Color(36,  48,  80 );
@@ -109,6 +127,47 @@ inline void configureFont(sf::Font& font) {
     font.setSmooth(false);
 }
 
+// Single entry point for the UI font — Inter, with Roboto as a fallback so a
+// missing file degrades instead of blanking the screen.
+inline bool loadUIFont(sf::Font& font) {
+    if (!font.openFromFile("assets/Inter-Regular.ttf") &&
+        !font.openFromFile("assets/Roboto-Regular.ttf"))
+        return false;
+    configureFont(font);
+    return true;
+}
+
+// Keep one world unit equal to one screen pixel after a resize. Without this
+// the default view is stretched to the new size and every glyph is resampled,
+// which is the single biggest source of blurry text in SFML.
+inline void syncViewToWindow(sf::RenderWindow& window, const sf::Event& event) {
+    if (const auto* r = event.getIf<sf::Event::Resized>())
+        window.setView(sf::View(sf::FloatRect(
+            {0.f, 0.f},
+            {static_cast<float>(r->size.x), static_cast<float>(r->size.y)})));
+}
+
+
+// ─── Type scale ─────────────────────────────────────────────────────────────
+// Named steps rather than magic numbers at each call site, so the hierarchy is
+// visible in one place and stays consistent between the two dashboards.
+namespace Type {
+    inline constexpr unsigned DISPLAY   = 30;  // landing hero
+    inline constexpr unsigned TITLE     = 25;  // screen / form titles
+    inline constexpr unsigned BUS_NAME  = 23;  // bus card — primary focus
+    inline constexpr unsigned BADGE_BUS = 21;  // bus ID chip
+    inline constexpr unsigned HEADING   = 20;  // page header, panel titles
+    inline constexpr unsigned BADGE_UNI = 19;  // university short-title chip
+    inline constexpr unsigned SUBTITLE  = 17;  // university full name
+    inline constexpr unsigned BODY      = 15;  // buttons, inputs, body copy
+    inline constexpr unsigned META      = 14;  // university · seats
+    inline constexpr unsigned ROUTE     = 13;  // route lines
+    inline constexpr unsigned LABEL     = 12;  // uppercase field labels
+    inline constexpr unsigned CAPTION   = 11;  // version strings
+
+    inline constexpr float LEADING_BODY = 1.35f;  // roomier line height
+}
+
 
 // ─── Color Utilities ────────────────────────────────────────────────────────
 inline sf::Color withAlpha(sf::Color c, uint8_t a) {
@@ -124,6 +183,96 @@ inline sf::Color lerp(sf::Color a, sf::Color b, float t) {
         static_cast<uint8_t>(a.a + (int(b.a) - int(a.a)) * t)
     );
 }
+
+
+// ─── Text Helpers ───────────────────────────────────────────────────────────
+// Every text path goes through these so that crispness (integer positions),
+// weight and line height are handled once instead of at ~120 call sites.
+
+inline sf::Text makeText(const sf::Font& font, const std::string& str,
+                          unsigned charSize, sf::Color color,
+                          std::uint32_t style = sf::Text::Regular)
+{
+    sf::Text t(font);
+    t.setString(str);
+    t.setCharacterSize(charSize);
+    t.setFillColor(color);
+    t.setStyle(style);
+    return t;
+}
+
+// Width of a string as it would be rendered — for laying out next to a badge.
+inline float textWidth(const sf::Font& font, const std::string& str,
+                        unsigned charSize, std::uint32_t style = sf::Text::Regular)
+{
+    return makeText(font, str, charSize, sf::Color::White, style).getLocalBounds().size.x;
+}
+
+// Draw at a top-left anchor, snapped to whole pixels.
+inline void drawText(sf::RenderTarget& target, const sf::Font& font,
+                      const std::string& str, unsigned charSize,
+                      sf::Color color, sf::Vector2f pos,
+                      std::uint32_t style = sf::Text::Regular,
+                      float lineSpacing = 1.f)
+{
+    sf::Text t = makeText(font, str, charSize, color, style);
+    if (lineSpacing != 1.f) t.setLineSpacing(lineSpacing);
+    t.setPosition(px(pos));
+    target.draw(t);
+}
+
+// Baseline-stable vertical centring: measured off fixed reference glyphs, so
+// the text doesn't shift when the string changes (e.g. a name with no
+// descender sitting next to one that has).
+inline float centeredTextY(const sf::Font& font, unsigned charSize,
+                            float rectY, float rectH,
+                            std::uint32_t style = sf::Text::Regular)
+{
+    sf::FloatRect ref = makeText(font, "Ag", charSize, sf::Color::White, style).getLocalBounds();
+    return std::round(rectY + (rectH - ref.size.y) * 0.5f - ref.position.y);
+}
+
+// Draw a single line vertically centred in a rect, left-aligned at x.
+inline void drawTextVCentered(sf::RenderTarget& target, const sf::Font& font,
+                               const std::string& str, unsigned charSize,
+                               sf::Color color, float x,
+                               float rectY, float rectH,
+                               std::uint32_t style = sf::Text::Regular)
+{
+    drawText(target, font, str, charSize, color,
+             {x, centeredTextY(font, charSize, rectY, rectH, style)}, style);
+}
+
+// Draw horizontally centred on cx, with the line box top at y.
+inline void drawTextHCentered(sf::RenderTarget& target, const sf::Font& font,
+                               const std::string& str, unsigned charSize,
+                               sf::Color color, float cx, float y,
+                               std::uint32_t style = sf::Text::Regular)
+{
+    sf::Text t = makeText(font, str, charSize, color, style);
+    sf::FloatRect b = t.getLocalBounds();
+    // Snap the final rendered origin, not the centre, so the glyph grid stays
+    // aligned even when the measured width is fractional.
+    t.setPosition(px(cx - (b.position.x + b.size.x * 0.5f), y));
+    target.draw(t);
+}
+
+// Trim to fit a pixel width, appending an ellipsis. Measured rather than
+// counted, so it stays correct at any character size.
+inline std::string ellipsize(const sf::Font& font, const std::string& str,
+                              unsigned charSize, float maxW,
+                              std::uint32_t style = sf::Text::Regular)
+{
+    if (textWidth(font, str, charSize, style) <= maxW) return str;
+    std::string out = str;
+    while (!out.empty() &&
+           textWidth(font, out + "...", charSize, style) > maxW)
+        out.pop_back();
+    while (!out.empty() && (out.back() == ' ' || out.back() == ','))
+        out.pop_back();
+    return out + "...";
+}
+
 
 
 // ─── Core Drawing Helpers ───────────────────────────────────────────────────
@@ -209,42 +358,64 @@ inline void drawAccentBar(sf::RenderTarget& target,
     target.draw(bar);
 }
 
-// Small pill / badge — positions snapped to pixels
-inline void drawBadge(sf::RenderTarget& target, const sf::Font& font,
+// Short-code chip (BUBT, SUB, B1, S1 …).
+//
+// The label is bold and optically centred on the chip's cap-height, and the
+// chip height is derived from a fixed reference glyph so every chip in a list
+// is exactly the same size regardless of its label.
+//
+// Returns the chip width so callers can place the following text against a
+// measured value instead of guessing at an average glyph width.
+inline float drawBadge(sf::RenderTarget& target, const sf::Font& font,
                        const std::string& label, sf::Vector2f pos,
-                       sf::Color bg, sf::Color textColor = sf::Color(255, 255, 255))
+                       sf::Color bg, sf::Color textColor,
+                       unsigned charSize = Type::BADGE_UNI,
+                       sf::Color edgeColor = sf::Color::Transparent,
+                       float minWidth = 48.f)
 {
-    sf::Text t(font);
-    t.setString(label);
-    t.setCharacterSize(12);
-    sf::FloatRect b = t.getLocalBounds();
-    const float px_ = 8.f, py_ = 3.f;
-    float bw = std::round(b.size.x + 2.f * px_);
-    float bh = std::round(b.size.y + 2.f * py_ + 2.f);
-    fillRoundedRect(target, px(pos), {bw, bh}, bh * 0.5f, bg);
-    t.setFillColor(textColor);
-    // Snap text inside badge to integers
-    t.setPosition(px(pos.x + px_ - b.position.x,
-                     pos.y + py_ - b.position.y));
+    const std::uint32_t style = sf::Text::Bold;
+    const float padX = 12.f, padY = 8.f;
+
+    sf::Text t = makeText(font, label, charSize, textColor, style);
+    sf::FloatRect ink = t.getLocalBounds();
+    // Uppercase reference: short codes have no descenders, so cap-height is
+    // the right thing to centre on.
+    sf::FloatRect cap = makeText(font, "H", charSize, textColor, style).getLocalBounds();
+
+    float bw = std::max(minWidth, std::round(ink.size.x + 2.f * padX));
+    float bh = std::round(cap.size.y + 2.f * padY);
+
+    sf::Vector2f p = px(pos);
+    if (edgeColor != sf::Color::Transparent)
+        drawRoundedRect(target, p, {bw, bh}, bh * 0.5f, bg, 1.f, edgeColor);
+    else
+        fillRoundedRect(target, p, {bw, bh}, bh * 0.5f, bg);
+
+    t.setPosition(px(p.x + (bw - ink.size.x) * 0.5f - ink.position.x,
+                     p.y + (bh - cap.size.y) * 0.5f - cap.position.y));
     target.draw(t);
+    return bw;
 }
 
-// Text centered in a rect — position snapped to integer pixels
+// Height of a chip at a given size — lets callers centre one in a card before
+// they know its label.
+inline float badgeHeight(const sf::Font& font, unsigned charSize = Type::BADGE_UNI) {
+    return std::round(makeText(font, "H", charSize, sf::Color::White,
+                               sf::Text::Bold).getLocalBounds().size.y + 16.f);
+}
+
+// Text centered in a rect — position and origin both snapped to integer
+// pixels, which is what keeps centred labels from rendering half a pixel off
+// and looking soft.
 inline void drawCenteredText(sf::RenderTarget& target, const sf::Font& font,
                               const std::string& str, unsigned charSize,
-                              sf::Color color, sf::FloatRect rect)
+                              sf::Color color, sf::FloatRect rect,
+                              std::uint32_t style = sf::Text::Regular)
 {
-    sf::Text t(font);
-    t.setString(str);
-    t.setCharacterSize(charSize);
-    t.setFillColor(color);
+    sf::Text t = makeText(font, str, charSize, color, style);
     sf::FloatRect b = t.getLocalBounds();
-    // Compute ideal centre then snap to integer
-    float idealX = rect.position.x + rect.size.x * 0.5f;
-    float idealY = rect.position.y + rect.size.y * 0.5f;
-    t.setOrigin({b.position.x + b.size.x * 0.5f,
-                 b.position.y + b.size.y * 0.5f});
-    t.setPosition(px(idealX, idealY));
+    t.setPosition(px(rect.position.x + (rect.size.x - b.size.x) * 0.5f - b.position.x,
+                     rect.position.y + (rect.size.y - b.size.y) * 0.5f - b.position.y));
     target.draw(t);
 }
 
@@ -276,15 +447,11 @@ inline void drawIconCircle(sf::RenderTarget& target, const sf::Font& font,
     circle.setPosition(px(center.x - radius, center.y - radius));
     target.draw(circle);
 
-    sf::Text lt(font);
-    lt.setString(letter);
-    lt.setCharacterSize(letterSize);
-    lt.setFillColor(letterColor);
-    sf::FloatRect b = lt.getLocalBounds();
-    lt.setOrigin({b.position.x + b.size.x * 0.5f,
-                  b.position.y + b.size.y * 0.5f});
-    lt.setPosition(px(center));   // snap icon letter
-    target.draw(lt);
+    // Bold: these single letters are identity marks and read as weak at
+    // regular weight against a tinted disc.
+    drawCenteredText(target, font, letter, letterSize, letterColor,
+                     {{center.x - radius, center.y - radius}, {radius * 2.f, radius * 2.f}},
+                     sf::Text::Bold);
 }
 
 // Auto-fade toast notification — snapped positions
@@ -292,26 +459,18 @@ inline void drawInfoToast(sf::RenderTarget& target, const sf::Font& font,
                            const std::string& msg, bool isError,
                            float windowW, float windowH, float alpha = 1.f)
 {
-    sf::Color bg  = isError ? withAlpha(DANGER_DARK, static_cast<uint8_t>(220 * alpha))
-                            : withAlpha(sf::Color(15, 80, 40), static_cast<uint8_t>(220 * alpha));
+    sf::Color bg  = isError ? withAlpha(DANGER_DARK, static_cast<uint8_t>(230 * alpha))
+                            : withAlpha(sf::Color(15, 80, 40), static_cast<uint8_t>(230 * alpha));
     sf::Color txt = withAlpha(TEXT_PRIMARY, static_cast<uint8_t>(255 * alpha));
 
     float tw = std::min(500.f, windowW - 40.f);
-    float th = 46.f;
+    float th = 48.f;
     float tx = std::round((windowW - tw) * 0.5f);
     float ty = std::round(windowH - th - 16.f);
 
     fillRoundedRect(target, {tx, ty}, {tw, th}, 8.f, bg);
-
-    sf::Text t(font);
-    t.setString(msg);
-    t.setCharacterSize(14);
-    t.setFillColor(txt);
-    sf::FloatRect b = t.getLocalBounds();
-    t.setOrigin({b.position.x + b.size.x * 0.5f,
-                 b.position.y + b.size.y * 0.5f});
-    t.setPosition(px(tx + tw * 0.5f, ty + th * 0.5f));
-    target.draw(t);
+    drawCenteredText(target, font, msg, Type::BODY, txt,
+                     {{tx, ty}, {tw, th}}, sf::Text::Bold);
 }
 
 } // namespace Theme

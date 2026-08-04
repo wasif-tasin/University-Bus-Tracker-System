@@ -65,8 +65,7 @@ void UserDashboardGUI::run()
     window.setFramerateLimit(60);
 
     sf::Font font;
-    if (!font.openFromFile("assets/Inter-Regular.ttf")) return;
-    Theme::configureFont(font);
+    if (!Theme::loadUIFont(font)) return;
 
     User user;
 
@@ -135,9 +134,10 @@ void UserDashboardGUI::run()
         Button srchStopBtn(font, "Search", {110.f, 44.f}, {srchBtnX, HH + 28.f});
 
 
-        // Card geometry
-        const float CARD_H   = 90.f;
-        const float CARD_GAP = 10.f;
+        // Card geometry — taller than before purely to give the larger type
+        // room to breathe (title row, meta row, route row).
+        const float CARD_H   = 108.f;
+        const float CARD_GAP = 12.f;
         const float CARD_X   = SW + 20.f;
         const float CARD_W   = CW - 40.f;
         const float LIST_TOP = HH + 20.f;
@@ -152,7 +152,7 @@ void UserDashboardGUI::run()
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
-
+            Theme::syncViewToWindow(window, *event);
             if (event->is<sf::Event::MouseButtonPressed>())
             {
                 // Sidebar nav
@@ -199,7 +199,9 @@ void UserDashboardGUI::run()
                 }
             }
 
-            if (event->is<sf::Event::TextEntered>()) {
+            if (event->is<sf::Event::TextEntered>() ||
+                event->is<sf::Event::KeyPressed>()  ||
+                event->is<sf::Event::MouseButtonPressed>()) {
                 if (state == USER_SELECT_UNIVERSITY) uniCodeBox.handleEvent(*event);
                 if (state == USER_SEARCH_BUS)        busIdBox.handleEvent(*event);
                 if (state == USER_SEARCH_BY_STOP)    stopBox.handleEvent(*event);
@@ -216,6 +218,8 @@ void UserDashboardGUI::run()
         window.clear(Theme::BG_DARK);
 
         // ── Helper: draw a bus card ───────────────────────────────────────
+        // Hierarchy: bus name is the primary focus (large + bold), the ID chip
+        // sits inline beside it, then university/seats, then the route.
         auto drawBusCard = [&](Bus b, float cx, float cy,
                                float cardW, bool hov, bool includeUni)
         {
@@ -223,31 +227,35 @@ void UserDashboardGUI::run()
             Theme::drawCard(window, {cx, cy}, {cardW, CARD_H}, bg, 8.f);
             Theme::drawAccentBar(window, cx, cy, CARD_H, Theme::PURPLE);
 
-            // ID badge — high contrast
-            Theme::drawBadge(window, font, b.getBusID(),
-                             {cx + 14.f, cy + 8.f},
-                             Theme::withAlpha(Theme::PURPLE, 90), sf::Color(220, 200, 255));
+            const float padL   = 16.f;
+            const float badgeH = Theme::badgeHeight(font, Theme::Type::BADGE_BUS);
+            const float rowY   = cy + 14.f;               // title row top
 
-            // Bus name — primary, large
-            sf::Text nm(font); nm.setString(b.getBusName());
-            nm.setCharacterSize(16); nm.setFillColor(Theme::TEXT_PRIMARY);
-            nm.setPosition(Theme::px(cx + 14.f, cy + 30.f));
-            window.draw(nm);
+            // Bus ID chip — bold, high contrast, on the title row
+            float badgeW = Theme::drawBadge(window, font, b.getBusID(),
+                                            {cx + padL, rowY},
+                                            Theme::BADGE_BUS_BG, Theme::BADGE_BUS_TEXT,
+                                            Theme::Type::BADGE_BUS, Theme::BADGE_BUS_EDGE);
 
-            // Secondary: uni code + seats
+            // Bus name — the largest, brightest thing on the card
+            const float nameX = cx + padL + badgeW + 16.f;
+            Theme::drawTextVCentered(window, font, b.getBusName(),
+                                     Theme::Type::BUS_NAME, Theme::TEXT_PRIMARY,
+                                     nameX, rowY, badgeH, sf::Text::Bold);
+
+            // University + seats
             string secondary = includeUni ? b.getUniversityCode() + "  ·  " : "";
             secondary += to_string(b.getTotalSeats()) + " seats";
-            sf::Text sec(font); sec.setString(secondary);
-            sec.setCharacterSize(12); sec.setFillColor(Theme::TEXT_SECONDARY);
-            sec.setPosition(Theme::px(cx + 14.f, cy + 50.f));
-            window.draw(sec);
+            const float metaY = rowY + badgeH + 12.f;
+            Theme::drawText(window, font, secondary, Theme::Type::META,
+                            Theme::TEXT_SECONDARY, {cx + padL, metaY});
 
-            // Route — brighter gray for readability
-            string wrappedRoute = wrapRouteU(b.getRoute(), cardW - 30.f, font, 12, "");
-            sf::Text rt(font); rt.setString(wrappedRoute);
-            rt.setCharacterSize(12); rt.setFillColor(sf::Color(140, 155, 175));
-            rt.setPosition(Theme::px(cx + 14.f, cy + 66.f));
-            window.draw(rt);
+            // Route — one measured line so a long route can't spill out of
+            // the card
+            string route = Theme::ellipsize(font, b.getRoute(), Theme::Type::ROUTE,
+                                            cardW - padL - 24.f);
+            Theme::drawText(window, font, route, Theme::Type::ROUTE,
+                            Theme::TEXT_ROUTE, {cx + padL, metaY + 24.f});
         };
 
         // ── Content ──────────────────────────────────────────────────────
@@ -259,65 +267,57 @@ void UserDashboardGUI::run()
             float scW = (CW - 60.f) * 0.5f;
             float sc1X = SW + 20.f, sc2X = SW + 30.f + scW;
 
-            Theme::drawCard(window, {sc1X, scy}, {scW, 108.f}, Theme::BG_CARD, 12.f);
-            Theme::drawAccentBar(window, sc1X, scy, 108.f, Theme::ACCENT, 5.f);
-            sf::Text n1(font); n1.setString(to_string(allUnis.size()));
-            n1.setCharacterSize(44); n1.setFillColor(Theme::ACCENT);
-            sf::FloatRect b1 = n1.getLocalBounds();
-            n1.setPosition(Theme::px(sc1X + 22.f, scy + 14.f - b1.position.y));
-            window.draw(n1);
-            sf::Text l1(font); l1.setString("UNIVERSITIES");
-            l1.setCharacterSize(11); l1.setFillColor(Theme::TEXT_SECONDARY);
-            l1.setPosition(Theme::px(sc1X + 22.f, scy + 78.f));
-            window.draw(l1);
+            // Stat card: big bold number, generous gap down to its label
+            auto statCard = [&](float x, sf::Color accent, const string& value,
+                                const string& label) {
+                Theme::drawCard(window, {x, scy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
+                Theme::drawAccentBar(window, x, scy, 116.f, accent, 5.f);
+                Theme::drawText(window, font, value, 46, accent,
+                                {x + 24.f, scy + 12.f}, sf::Text::Bold);
+                Theme::drawText(window, font, label, Theme::Type::LABEL,
+                                Theme::TEXT_MUTED, {x + 24.f, scy + 84.f},
+                                sf::Text::Bold);
+            };
+            statCard(sc1X, Theme::ACCENT, to_string(allUnis.size()),  "UNIVERSITIES");
+            statCard(sc2X, Theme::PURPLE, to_string(allBuses.size()), "BUSES");
 
-            Theme::drawCard(window, {sc2X, scy}, {scW, 108.f}, Theme::BG_CARD, 12.f);
-            Theme::drawAccentBar(window, sc2X, scy, 108.f, Theme::PURPLE, 5.f);
-            sf::Text n2(font); n2.setString(to_string(allBuses.size()));
-            n2.setCharacterSize(44); n2.setFillColor(Theme::PURPLE);
-            sf::FloatRect b2 = n2.getLocalBounds();
-            n2.setPosition(Theme::px(sc2X + 22.f, scy + 14.f - b2.position.y));
-            window.draw(n2);
-            sf::Text l2(font); l2.setString("BUSES");
-            l2.setCharacterSize(11); l2.setFillColor(Theme::TEXT_SECONDARY);
-            l2.setPosition(Theme::px(sc2X + 22.f, scy + 78.f));
-            window.draw(l2);
-
-            sf::Text hint(font);
-            hint.setString("Use the sidebar to browse universities and bus routes.");
-            hint.setCharacterSize(13); hint.setFillColor(Theme::TEXT_MUTED);
-            hint.setPosition(Theme::px(SW + 22.f, scy + 132.f));
-            window.draw(hint);
+            Theme::drawText(window, font,
+                            "Use the sidebar to browse universities and bus routes.",
+                            Theme::Type::META, Theme::TEXT_SECONDARY,
+                            {SW + 22.f, scy + 148.f});
         }
         else if (state == USER_VIEW_UNIVERSITIES) {
-            float totalH = unis.size() * (65.f + CARD_GAP);
+            const float UCARD_H = 76.f;
+            float totalH = unis.size() * (UCARD_H + CARD_GAP);
             maxScroll = max(0.f, totalH - CH + 40.f);
             scrollOff = clamp(scrollOff, 0.f, maxScroll);
 
+            const float badgeH = Theme::badgeHeight(font, Theme::Type::BADGE_UNI);
+
             for (int i = 0; i < (int)unis.size(); ++i) {
-                float cy = LIST_TOP + i * (65.f + CARD_GAP) - scrollOff;
-                if (cy + 65.f < HH || cy > wh) continue;
-                bool hov = inContent && my >= cy && my < cy + 65.f;
+                float cy = LIST_TOP + i * (UCARD_H + CARD_GAP) - scrollOff;
+                if (cy + UCARD_H < HH || cy > wh) continue;
+                bool hov = inContent && my >= cy && my < cy + UCARD_H;
                 sf::Color bg = hov ? Theme::ITEM_HOVER : Theme::ITEM_BG;
-                Theme::drawCard(window, {CARD_X, cy}, {CARD_W, 65.f}, bg, 8.f);
-                Theme::drawAccentBar(window, CARD_X, cy, 65.f, Theme::ACCENT);
+                Theme::drawCard(window, {CARD_X, cy}, {CARD_W, UCARD_H}, bg, 8.f);
+                Theme::drawAccentBar(window, CARD_X, cy, UCARD_H, Theme::ACCENT);
 
-                // Badge — high contrast
-                Theme::drawBadge(window, font, unis[i].first,
-                                 {CARD_X + 14.f, cy + (65.f - 28.f) * 0.5f},
-                                 Theme::withAlpha(Theme::ACCENT, 90), sf::Color(220, 235, 255));
+                // Short title chip — bold, centred, vertically centred in card
+                float badgeW = Theme::drawBadge(
+                    window, font, unis[i].first,
+                    {CARD_X + 16.f, std::round(cy + (UCARD_H - badgeH) * 0.5f)},
+                    Theme::BADGE_UNI_BG, Theme::BADGE_UNI_TEXT,
+                    Theme::Type::BADGE_UNI, Theme::BADGE_UNI_EDGE);
 
-                float badgeW = static_cast<float>(unis[i].first.size()) * 8.5f + 32.f;
-                sf::Text nm(font); nm.setString(unis[i].second);
-                nm.setCharacterSize(15); nm.setFillColor(Theme::TEXT_PRIMARY);
-                sf::FloatRect bn = nm.getLocalBounds();
-                nm.setPosition(Theme::px(CARD_X + 14.f + badgeW + 14.f,
-                                         cy + (65.f - bn.size.y) * 0.5f - bn.position.y));
-                window.draw(nm);
+                // Full name — measured off the chip instead of estimated
+                Theme::drawTextVCentered(window, font, unis[i].second,
+                                         Theme::Type::SUBTITLE, Theme::TEXT_PRIMARY,
+                                         CARD_X + 16.f + badgeW + 16.f,
+                                         cy, UCARD_H, sf::Text::Bold);
             }
             if (unis.empty()) {
                 Theme::drawCenteredText(window, font, "No universities registered.",
-                                        16, Theme::TEXT_MUTED,
+                                        Theme::Type::BODY, Theme::TEXT_MUTED,
                                         {{SW + 20.f, HH + 80.f}, {CW - 40.f, 60.f}});
             }
         }
@@ -334,7 +334,7 @@ void UserDashboardGUI::run()
             }
             if (buses.empty()) {
                 Theme::drawCenteredText(window, font, "No buses registered.",
-                                        16, Theme::TEXT_MUTED,
+                                        Theme::Type::BODY, Theme::TEXT_MUTED,
                                         {{SW + 20.f, HH + 80.f}, {CW - 40.f, 60.f}});
             }
         }
@@ -362,24 +362,37 @@ void UserDashboardGUI::run()
                 // Show full detail card for the matched bus
                 auto b = buses[0];
                 float cy = HH + 92.f;
-                Theme::drawCard(window, {CARD_X, cy}, {CARD_W, 200.f}, Theme::ITEM_BG, 10.f);
-                Theme::drawAccentBar(window, CARD_X, cy, 200.f, Theme::PURPLE, 4.f);
+                Theme::drawCard(window, {CARD_X, cy}, {CARD_W, 230.f}, Theme::ITEM_BG, 10.f);
+                Theme::drawAccentBar(window, CARD_X, cy, 230.f, Theme::PURPLE, 4.f);
 
-                auto row = [&](const string& lbl, const string& val, float ry) {
-                    sf::Text lt(font); lt.setString(lbl);
-                    lt.setCharacterSize(12); lt.setFillColor(Theme::TEXT_MUTED);
-                    lt.setPosition({CARD_X + 18.f, cy + ry}); window.draw(lt);
-                    sf::Text vt(font); vt.setString(val);
-                    vt.setCharacterSize(15); vt.setFillColor(Theme::TEXT_PRIMARY);
-                    vt.setPosition({CARD_X + 148.f, cy + ry - 2.f}); window.draw(vt);
+                // label = minor, value = primary; the extra column gap and
+                // line height are what make this readable at a glance.
+                auto row = [&](const string& lbl, const string& val, float ry,
+                               unsigned valSize = Theme::Type::BODY,
+                               std::uint32_t valStyle = sf::Text::Regular,
+                               sf::Color valColor = Theme::TEXT_SECONDARY) {
+                    Theme::drawText(window, font, lbl, Theme::Type::LABEL,
+                                    Theme::TEXT_MUTED, {CARD_X + 20.f, cy + ry + 3.f},
+                                    sf::Text::Bold);
+                    Theme::drawText(window, font, val, valSize, valColor,
+                                    {CARD_X + 160.f, cy + ry}, valStyle,
+                                    Theme::Type::LEADING_BODY);
                 };
-                row("Bus ID",     b.getBusID(),                          14.f);
-                row("Name",       b.getBusName(),                        42.f);
-                row("University", b.getUniversityCode(),                 70.f);
-                row("Seats",      to_string(b.getTotalSeats()),          98.f);
+                row("BUS ID",     b.getBusID(),   16.f, Theme::Type::BADGE_BUS,
+                    sf::Text::Bold, Theme::TEXT_PRIMARY);
+                row("NAME",       b.getBusName(), 54.f, Theme::Type::BUS_NAME,
+                    sf::Text::Bold, Theme::TEXT_PRIMARY);
+                row("UNIVERSITY", b.getUniversityCode(),        96.f);
+                row("SEATS",      to_string(b.getTotalSeats()), 126.f);
 
-                string wrappedRoute = wrapRouteU(b.getRoute(), CARD_W - 170.f, font, 14);
-                row("Route", wrappedRoute, 126.f);
+                string wrappedRoute = wrapRouteU(b.getRoute(), CARD_W - 190.f,
+                                                 font, Theme::Type::ROUTE, "");
+                Theme::drawText(window, font, "ROUTE", Theme::Type::LABEL,
+                                Theme::TEXT_MUTED, {CARD_X + 20.f, cy + 159.f},
+                                sf::Text::Bold);
+                Theme::drawText(window, font, wrappedRoute, Theme::Type::ROUTE,
+                                Theme::TEXT_ROUTE, {CARD_X + 160.f, cy + 156.f},
+                                sf::Text::Regular, Theme::Type::LEADING_BODY);
             }
         }
         else if (state == USER_SEARCH_BY_STOP) {
@@ -407,16 +420,10 @@ void UserDashboardGUI::run()
             sbd.setPosition({SW - 1.f, 0.f});
             sbd.setFillColor(Theme::BORDER_IDLE); window.draw(sbd);
 
-            sf::Text an(font); an.setString("Bus Tracker");
-            an.setCharacterSize(16); an.setFillColor(Theme::ACCENT);
-            sf::FloatRect ab = an.getLocalBounds();
-            an.setOrigin({ab.position.x + ab.size.x * 0.5f, 0.f});
-            an.setPosition({SW * 0.5f, 16.f}); window.draw(an);
-            sf::Text ro(font); ro.setString("User");
-            ro.setCharacterSize(11); ro.setFillColor(Theme::TEXT_MUTED);
-            sf::FloatRect rb = ro.getLocalBounds();
-            ro.setOrigin({rb.position.x + rb.size.x * 0.5f, 0.f});
-            ro.setPosition({SW * 0.5f, 36.f}); window.draw(ro);
+            Theme::drawTextHCentered(window, font, "Bus Tracker", Theme::Type::SUBTITLE,
+                                     Theme::ACCENT, SW * 0.5f, 14.f, sf::Text::Bold);
+            Theme::drawTextHCentered(window, font, "USER", Theme::Type::CAPTION,
+                                     Theme::TEXT_MUTED, SW * 0.5f, 38.f, sf::Text::Bold);
 
             Theme::drawSeparator(window, 0.f, 70.f, SW);
 
@@ -433,12 +440,11 @@ void UserDashboardGUI::run()
                 }
                 if (active) Theme::drawAccentBar(window, 0.f, nav.y, 42.f, Theme::ACCENT);
 
-                sf::Text nt(font); nt.setString(nav.label);
-                nt.setCharacterSize(13);
-                nt.setFillColor(active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY);
-                sf::FloatRect nb = nt.getLocalBounds();
-                nt.setPosition({16.f, nav.y + (42.f - nb.size.y) * 0.5f - nb.position.y});
-                window.draw(nt);
+                // Weight, not just colour, carries the active state
+                Theme::drawTextVCentered(window, font, nav.label, Theme::Type::META,
+                                         active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
+                                         18.f, nav.y, 42.f,
+                                         active ? sf::Text::Bold : sf::Text::Regular);
             }
 
             // Logout
@@ -449,11 +455,9 @@ void UserDashboardGUI::run()
                 window.draw(lb);
             }
             Theme::drawSeparator(window, 0.f, wh - 56.f, SW);
-            sf::Text lt(font); lt.setString("Logout");
-            lt.setCharacterSize(14); lt.setFillColor(Theme::DANGER);
-            sf::FloatRect ltb = lt.getLocalBounds();
-            lt.setPosition({16.f, wh - 52.f + (40.f - ltb.size.y) * 0.5f - ltb.position.y});
-            window.draw(lt);
+            Theme::drawTextVCentered(window, font, "Logout", Theme::Type::META,
+                                     Theme::DANGER_HOVER, 18.f, wh - 52.f, 40.f,
+                                     sf::Text::Bold);
         }
 
         // ── HEADER BAR ────────────────────────────────────────────────────
@@ -472,11 +476,9 @@ void UserDashboardGUI::run()
             else if (state == USER_SEARCH_BUS)    pageTitle = "Search Bus";
             else if (state == USER_SEARCH_BY_STOP) pageTitle = "Search by Stop";
 
-            sf::Text pt(font); pt.setString(pageTitle);
-            pt.setCharacterSize(17); pt.setFillColor(Theme::TEXT_PRIMARY);
-            sf::FloatRect pb = pt.getLocalBounds();
-            pt.setPosition({SW + 22.f, (HH - pb.size.y) * 0.5f - pb.position.y});
-            window.draw(pt);
+            Theme::drawTextVCentered(window, font, pageTitle, Theme::Type::HEADING,
+                                     Theme::TEXT_PRIMARY, SW + 24.f, 0.f, HH,
+                                     sf::Text::Bold);
         }
 
         // ── Toast ─────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 #define TEXTBOX_H
 
 #include <SFML/Graphics.hpp>
+#include <cstddef>
 #include <string>
 
 class TextBox
@@ -16,7 +17,19 @@ private:
     bool         m_passwordMode;
     bool         m_showText;       // true = reveal password
     float        m_glowT;
+    std::size_t  m_caret;          // insertion point, 0 .. m_value.size()
     sf::Clock    m_cursorClock;
+
+    // Internal helpers
+    std::string  displayString() const;              // masked or plain
+    sf::Text     makeText(const std::string& s) const;
+    float        innerWidth() const;                 // usable text width
+    bool         fits(const std::string& candidate) const;
+    float        caretOffset(const sf::Text& t, std::size_t i) const;
+    std::size_t  caretIndexAt(float mouseX) const;   // nearest gap to an x coord
+    std::size_t  prevWord(std::size_t i) const;
+    std::size_t  nextWord(std::size_t i) const;
+    void         insertText(const std::string& s);
 
 public:
     TextBox(sf::Font& font, sf::Vector2f size, sf::Vector2f position);

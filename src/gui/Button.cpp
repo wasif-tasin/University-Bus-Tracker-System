@@ -57,16 +57,10 @@ void Button::draw(sf::RenderWindow& window) {
 
     Theme::drawRoundedRect(window, m_pos, m_size, m_radius, fill, borderW, borderC);
 
-    sf::Text txt(m_font);
-    txt.setString(m_label);
-    txt.setCharacterSize(15);
-    txt.setFillColor(Theme::TEXT_PRIMARY);
-    sf::FloatRect b = txt.getLocalBounds();
-    txt.setOrigin({b.position.x + b.size.x * 0.5f,
-                   b.position.y + b.size.y * 0.5f});
-    txt.setPosition(Theme::px(m_pos.x + m_size.x * 0.5f,
-                              m_pos.y + m_size.y * 0.5f));
-    window.draw(txt);
+    // Bold label, pure white, centred on whole pixels — button text is a
+    // primary action and was the most obviously washed-out text in the old UI.
+    Theme::drawCenteredText(window, m_font, m_label, Theme::Type::BODY,
+                            Theme::TEXT_PRIMARY, {m_pos, m_size}, sf::Text::Bold);
 }
 
 void Button::update(sf::RenderWindow& window) {
