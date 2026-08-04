@@ -6,4 +6,4 @@ public:
     void run();
 };
 
-#endif // USERPANELGUI_H
+#endif 

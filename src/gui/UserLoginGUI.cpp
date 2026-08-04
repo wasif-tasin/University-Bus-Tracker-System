@@ -21,9 +21,6 @@ void UserLoginGUI::run()
     std::string errorText;
     bool focusEmail = true;
 
-    // ── Layout ────────────────────────────────────────────────────────
-    // Card height is even so the centred card lands on integer pixels; a
-    // half-pixel origin here would soften every glyph inside it.
     const float ww = 720.f, wh = 500.f;
     const float cW = std::min(480.f, ww - 60.f);
     const float cH = 376.f;
@@ -32,7 +29,6 @@ void UserLoginGUI::run()
     const float fX = cX + 28.f;
     const float fW = cW - 56.f;
 
-    // ── TextBox objects outside the game loop ─────────────────────────
     TextBox emailBox(font, {fW, 46.f}, {fX, cY + 140.f});
     TextBox passBox (font, {fW, 46.f}, {fX, cY + 220.f});
     emailBox.setPlaceholder("yourname@gmail.com");
@@ -74,7 +70,6 @@ void UserLoginGUI::run()
                 }
                 if (backBtn.isClicked(window)) window.close();
 
-                // Deliver to textboxes for eye-icon click detection
                 emailBox.handleEvent(*event);
                 passBox.handleEvent(*event);
             }
@@ -89,7 +84,6 @@ void UserLoginGUI::run()
         loginBtn.update(window);
         backBtn.update(window);
 
-        // ── Draw ─────────────────────────────────────────────────────
         window.clear(Theme::BG_DARK);
         Theme::drawGradientRect(window, {0.f, 0.f}, {ww, wh},
                                 sf::Color(15, 22, 40), sf::Color(10, 15, 28));

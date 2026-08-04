@@ -57,8 +57,6 @@ void Button::draw(sf::RenderWindow& window) {
 
     Theme::drawRoundedRect(window, m_pos, m_size, m_radius, fill, borderW, borderC);
 
-    // Bold label, pure white, centred on whole pixels — button text is a
-    // primary action and was the most obviously washed-out text in the old UI.
     Theme::drawCenteredText(window, m_font, m_label, Theme::Type::BODY,
                             Theme::TEXT_PRIMARY, {m_pos, m_size}, sf::Text::Bold);
 }

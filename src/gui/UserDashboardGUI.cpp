@@ -12,7 +12,6 @@
 
 using namespace std;
 
-// ── Route word-wrap helper ───────────────────────────────────────────────────
 static string wrapRouteU(const string& route, float maxW,
                           const sf::Font& font, unsigned sz,
                           const string& prefix = "Route: ")
@@ -48,7 +47,6 @@ static string wrapRouteU(const string& route, float maxW,
     return wrapped;
 }
 
-// ── State ────────────────────────────────────────────────────────────────────
 enum UserState {
     USER_DASHBOARD,
     USER_VIEW_UNIVERSITIES,
@@ -82,7 +80,6 @@ void UserDashboardGUI::run()
         infoText = msg; infoErr = err; showInfo = true; infoTimer.restart();
     };
 
-    // Sidebar layout constants
     const float SW = 210.f;
     const float HH = 60.f;
 
@@ -95,14 +92,12 @@ void UserDashboardGUI::run()
         {"Search by Stop",  USER_SEARCH_BY_STOP,    282.f},
     };
 
-    // ── Pre-compute search-box layout (fixed window 1100x720) ───────────────
-    const float CW_FIXED = 1100.f - SW;   // 890
-    const float fX_FIX   = SW + 32.f;     // 242
-    const float fW_FIX   = CW_FIXED - 64.f; // 826
+    const float CW_FIXED = 1100.f - SW;   
+    const float fX_FIX   = SW + 32.f;     
+    const float fW_FIX   = CW_FIXED - 64.f; 
     const float srchW    = fW_FIX * 0.55f;
     const float srchBtnX = fX_FIX + srchW + 12.f;
 
-    // ── Search TextBox objects OUTSIDE the game loop so text persists ───
     TextBox uniCodeBox(font, {srchW, 44.f}, {fX_FIX, HH + 28.f});
     TextBox busIdBox  (font, {srchW, 44.f}, {fX_FIX, HH + 28.f});
     TextBox stopBox   (font, {srchW, 44.f}, {fX_FIX, HH + 28.f});
@@ -124,7 +119,6 @@ void UserDashboardGUI::run()
 
 
 
-        // Sync focus each frame (no re-construction)
         uniCodeBox.setFocused(state == USER_SELECT_UNIVERSITY);
         busIdBox.setFocused  (state == USER_SEARCH_BUS);
         stopBox.setFocused   (state == USER_SEARCH_BY_STOP);
@@ -133,29 +127,23 @@ void UserDashboardGUI::run()
         Button srchBusBtn (font, "Search", {110.f, 44.f}, {srchBtnX, HH + 28.f});
         Button srchStopBtn(font, "Search", {110.f, 44.f}, {srchBtnX, HH + 28.f});
 
-
-        // Card geometry — taller than before purely to give the larger type
-        // room to breathe (title row, meta row, route row).
         const float CARD_H   = 108.f;
         const float CARD_GAP = 12.f;
         const float CARD_X   = SW + 20.f;
         const float CARD_W   = CW - 40.f;
         const float LIST_TOP = HH + 20.f;
 
-        // Mouse
         auto mp  = sf::Mouse::getPosition(window);
         float mx = static_cast<float>(mp.x);
         float my = static_cast<float>(mp.y);
         bool inContent = mx >= SW && my >= HH;
 
-        // ── Events ───────────────────────────────────────────────────────
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
             Theme::syncViewToWindow(window, *event);
             if (event->is<sf::Event::MouseButtonPressed>())
             {
-                // Sidebar nav
                 if (mx < SW) {
                     for (auto& nav : navItems) {
                         if (my >= nav.y && my < nav.y + 42.f) {
@@ -173,7 +161,6 @@ void UserDashboardGUI::run()
                 }
 
                 if (inContent) {
-                    // Search triggers
                     if (state == USER_SELECT_UNIVERSITY && srchUniBtn.isClicked(window)) {
                         buses = user.getBusesForUniversity(uniCodeBox.getText());
                         scrollOff = 0.f;
@@ -212,14 +199,8 @@ void UserDashboardGUI::run()
         srchBusBtn.update(window);
         srchStopBtn.update(window);
 
-        // ═══════════════════════════════════════════════════════════════
-        //  DRAW
-        // ═══════════════════════════════════════════════════════════════
         window.clear(Theme::BG_DARK);
 
-        // ── Helper: draw a bus card ───────────────────────────────────────
-        // Hierarchy: bus name is the primary focus (large + bold), the ID chip
-        // sits inline beside it, then university/seats, then the route.
         auto drawBusCard = [&](Bus b, float cx, float cy,
                                float cardW, bool hov, bool includeUni)
         {
@@ -229,36 +210,30 @@ void UserDashboardGUI::run()
 
             const float padL   = 16.f;
             const float badgeH = Theme::badgeHeight(font, Theme::Type::BADGE_BUS);
-            const float rowY   = cy + 14.f;               // title row top
+            const float rowY   = cy + 14.f;              
 
-            // Bus ID chip — bold, high contrast, on the title row
             float badgeW = Theme::drawBadge(window, font, b.getBusID(),
                                             {cx + padL, rowY},
                                             Theme::BADGE_BUS_BG, Theme::BADGE_BUS_TEXT,
                                             Theme::Type::BADGE_BUS, Theme::BADGE_BUS_EDGE);
 
-            // Bus name — the largest, brightest thing on the card
             const float nameX = cx + padL + badgeW + 16.f;
             Theme::drawTextVCentered(window, font, b.getBusName(),
                                      Theme::Type::BUS_NAME, Theme::TEXT_PRIMARY,
                                      nameX, rowY, badgeH, sf::Text::Bold);
 
-            // University + seats
             string secondary = includeUni ? b.getUniversityCode() + "  ·  " : "";
             secondary += to_string(b.getTotalSeats()) + " seats";
             const float metaY = rowY + badgeH + 12.f;
             Theme::drawText(window, font, secondary, Theme::Type::META,
                             Theme::TEXT_SECONDARY, {cx + padL, metaY});
 
-            // Route — one measured line so a long route can't spill out of
-            // the card
             string route = Theme::ellipsize(font, b.getRoute(), Theme::Type::ROUTE,
                                             cardW - padL - 24.f);
             Theme::drawText(window, font, route, Theme::Type::ROUTE,
                             Theme::TEXT_ROUTE, {cx + padL, metaY + 24.f});
         };
 
-        // ── Content ──────────────────────────────────────────────────────
         if (state == USER_DASHBOARD) {
             auto allUnis  = user.getUniversities();
             auto allBuses = user.getBuses();
@@ -267,7 +242,6 @@ void UserDashboardGUI::run()
             float scW = (CW - 60.f) * 0.5f;
             float sc1X = SW + 20.f, sc2X = SW + 30.f + scW;
 
-            // Stat card: big bold number, generous gap down to its label
             auto statCard = [&](float x, sf::Color accent, const string& value,
                                 const string& label) {
                 Theme::drawCard(window, {x, scy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
@@ -302,14 +276,12 @@ void UserDashboardGUI::run()
                 Theme::drawCard(window, {CARD_X, cy}, {CARD_W, UCARD_H}, bg, 8.f);
                 Theme::drawAccentBar(window, CARD_X, cy, UCARD_H, Theme::ACCENT);
 
-                // Short title chip — bold, centred, vertically centred in card
                 float badgeW = Theme::drawBadge(
                     window, font, unis[i].first,
                     {CARD_X + 16.f, std::round(cy + (UCARD_H - badgeH) * 0.5f)},
                     Theme::BADGE_UNI_BG, Theme::BADGE_UNI_TEXT,
                     Theme::Type::BADGE_UNI, Theme::BADGE_UNI_EDGE);
 
-                // Full name — measured off the chip instead of estimated
                 Theme::drawTextVCentered(window, font, unis[i].second,
                                          Theme::Type::SUBTITLE, Theme::TEXT_PRIMARY,
                                          CARD_X + 16.f + badgeW + 16.f,
@@ -359,14 +331,11 @@ void UserDashboardGUI::run()
             srchBusBtn.draw(window);
 
             if (!buses.empty()) {
-                // Show full detail card for the matched bus
                 auto b = buses[0];
                 float cy = HH + 92.f;
                 Theme::drawCard(window, {CARD_X, cy}, {CARD_W, 230.f}, Theme::ITEM_BG, 10.f);
                 Theme::drawAccentBar(window, CARD_X, cy, 230.f, Theme::PURPLE, 4.f);
 
-                // label = minor, value = primary; the extra column gap and
-                // line height are what make this readable at a glance.
                 auto row = [&](const string& lbl, const string& val, float ry,
                                unsigned valSize = Theme::Type::BODY,
                                std::uint32_t valStyle = sf::Text::Regular,
@@ -412,7 +381,6 @@ void UserDashboardGUI::run()
             }
         }
 
-        // ── SIDEBAR ───────────────────────────────────────────────────────
         {
             sf::RectangleShape sbg({SW, wh});
             sbg.setFillColor(Theme::BG_SIDEBAR); window.draw(sbg);
@@ -440,14 +408,12 @@ void UserDashboardGUI::run()
                 }
                 if (active) Theme::drawAccentBar(window, 0.f, nav.y, 42.f, Theme::ACCENT);
 
-                // Weight, not just colour, carries the active state
                 Theme::drawTextVCentered(window, font, nav.label, Theme::Type::META,
                                          active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
                                          18.f, nav.y, 42.f,
                                          active ? sf::Text::Bold : sf::Text::Regular);
             }
 
-            // Logout
             bool lh = mx < SW && my >= wh - 52.f && my < wh - 12.f;
             if (lh) {
                 sf::RectangleShape lb({SW, 40.f});
@@ -460,7 +426,6 @@ void UserDashboardGUI::run()
                                      sf::Text::Bold);
         }
 
-        // ── HEADER BAR ────────────────────────────────────────────────────
         {
             sf::RectangleShape hbg({ww - SW, HH});
             hbg.setPosition({SW, 0.f}); hbg.setFillColor(Theme::BG_HEADER);
@@ -481,7 +446,6 @@ void UserDashboardGUI::run()
                                      sf::Text::Bold);
         }
 
-        // ── Toast ─────────────────────────────────────────────────────────
         if (showInfo) {
             float elapsed = infoTimer.getElapsedTime().asSeconds();
             float alpha   = elapsed > 2.f ? 1.f - (elapsed - 2.f) : 1.f;

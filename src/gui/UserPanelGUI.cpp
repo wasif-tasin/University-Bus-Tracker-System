@@ -23,7 +23,6 @@ void UserPanelGUI::run()
         float ww = static_cast<float>(sz.x);
         float wh = static_cast<float>(sz.y);
 
-        // --- Layout (responsive) ---
         float cardW  = std::min(420.f, ww - 60.f);
         float cardH  = 260.f;
         float cardX  = (ww - cardW) * 0.5f;
@@ -39,7 +38,6 @@ void UserPanelGUI::run()
         Button regBtn  (font, "Register",     {btnW, btnH}, {btnX, regY},   ButtonStyle::SECONDARY);
         Button backBtn (font, "< Back",       {90.f, 34.f}, {20.f, 16.f},  ButtonStyle::GHOST);
 
-        // --- Events ---
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
@@ -63,31 +61,25 @@ void UserPanelGUI::run()
         loginBtn.update(window);
         regBtn.update(window);
         backBtn.update(window);
-
-        // --- Draw ---
         window.clear(Theme::BG_DARK);
 
-        // Background gradient
         Theme::drawGradientRect(window, {0.f, 0.f}, {ww, wh},
                                 sf::Color(15, 22, 40), sf::Color(10, 16, 30));
 
-        // Card
+        
         Theme::drawCard(window, {cardX, cardY}, {cardW, cardH}, Theme::BG_CARD, 14.f);
 
-        // Top accent strip
         sf::RectangleShape accent({cardW, 4.f});
         accent.setPosition({cardX, cardY});
         accent.setFillColor(Theme::ACCENT);
         window.draw(accent);
 
-        // Icon circle
         Theme::drawIconCircle(window, font,
                               {cardX + cardW * 0.5f, cardY + 45.f},
                               22.f,
                               Theme::withAlpha(Theme::ACCENT, 55), "U",
                               Theme::ACCENT, 18);
 
-        // Title
         Theme::drawTextHCentered(window, font, "User Panel", Theme::Type::TITLE,
                                  Theme::TEXT_PRIMARY, cardX + cardW * 0.5f,
                                  cardY + 68.f, sf::Text::Bold);

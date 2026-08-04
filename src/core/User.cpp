@@ -17,7 +17,6 @@ void User::registerUser()
     cout << "Enter Gmail : ";
     getline(cin, email);
 
-    // Gmail Validation
     if (email.size() <= 10 ||
         email.substr(email.size() - 10) != "@gmail.com")
     {
@@ -27,8 +26,6 @@ void User::registerUser()
 
     cout << "Enter Password : ";
     getline(cin, password);
-
-    // Duplicate Gmail Check
     ifstream checkFile("data/users.txt");
 
     string existingEmail, existingPassword;
@@ -45,8 +42,6 @@ void User::registerUser()
     }
 
     checkFile.close();
-
-    // Save User
     ofstream file("data/users.txt", ios::app);
 
     file << email << "|" << password << endl;

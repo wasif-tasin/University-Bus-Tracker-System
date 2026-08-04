@@ -15,18 +15,18 @@ private:
     std::string  m_placeholder;
     bool         m_focused;
     bool         m_passwordMode;
-    bool         m_showText;       // true = reveal password
+    bool         m_showText;       
     float        m_glowT;
-    std::size_t  m_caret;          // insertion point, 0 .. m_value.size()
+    std::size_t  m_caret;        
     sf::Clock    m_cursorClock;
 
-    // Internal helpers
-    std::string  displayString() const;              // masked or plain
+   
+    std::string  displayString() const;             
     sf::Text     makeText(const std::string& s) const;
-    float        innerWidth() const;                 // usable text width
+    float        innerWidth() const;                
     bool         fits(const std::string& candidate) const;
     float        caretOffset(const sf::Text& t, std::size_t i) const;
-    std::size_t  caretIndexAt(float mouseX) const;   // nearest gap to an x coord
+    std::size_t  caretIndexAt(float mouseX) const;  
     std::size_t  prevWord(std::size_t i) const;
     std::size_t  nextWord(std::size_t i) const;
     void         insertText(const std::string& s);
@@ -34,13 +34,13 @@ private:
 public:
     TextBox(sf::Font& font, sf::Vector2f size, sf::Vector2f position);
 
-    // Original API (unchanged)
+
     void        draw(sf::RenderWindow& window);
     void        handleEvent(const sf::Event& event);
     void        setFocused(bool focused);
     std::string getText() const;
 
-    // New helpers
+
     void setPlaceholder(const std::string& ph);
     void setPasswordMode(bool pm);
     void clear();
@@ -49,4 +49,4 @@ public:
     sf::FloatRect getBounds() const;
 };
 
-#endif // TEXTBOX_H
+#endif

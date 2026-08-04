@@ -13,10 +13,6 @@
 
 using namespace std;
 
-// (wrapRoute not needed in this file)
-
-
-// ── State enum ───────────────────────────────────────────────────────────────
 enum AdminState { DASHBOARD, VIEW_UNIVERSITIES, ADD_UNIVERSITY, VIEW_BUSES, ADD_BUS };
 
 void AdminDashboardGUI::run()
@@ -29,16 +25,12 @@ void AdminDashboardGUI::run()
     if (!Theme::loadUIFont(font)) return;
 
     Admin admin;
-
-    // ── State ────────────────────────────────────────────────────────────
     AdminState state    = DASHBOARD;
     int        selIdx   = -1;
     float      scrollOff = 0.f, maxScroll = 0.f;
 
     vector<pair<string,string>> unis;
     vector<Bus>                 buses;
-
-    // ── Info toast ───────────────────────────────────────────────────────
     string    infoText;
     bool      infoErr  = false;
     bool      showInfo = false;
@@ -47,13 +39,9 @@ void AdminDashboardGUI::run()
         infoText  = msg; infoErr = err;
         showInfo  = true; infoTimer.restart();
     };
-
-    // ── Focus tracking for form fields ───────────────────────────────────
     int focusField = 0;
-
-    // ── Sidebar nav constants ─────────────────────────────────────────────
-    const float SW   = 210.f; // sidebar width
-    const float HH   = 60.f;  // header height
+    const float SW   = 210.f; 
+    const float HH   = 60.f;  
     struct NavItem { string label; AdminState st; float y; };
     const vector<NavItem> navItems = {
         {"Dashboard",    DASHBOARD,         82.f},
@@ -61,22 +49,18 @@ void AdminDashboardGUI::run()
         {"Buses",        VIEW_BUSES,        182.f},
     };
 
-    // ── Pre-compute form layout (window is fixed 1100x720) ───────────────
-    const float CW_FIXED = 1100.f - SW;   // 890
-    const float fX  = SW + 32.f;          // 242
-    const float fW  = CW_FIXED - 64.f;    // 826
-    const float fW2 = (fW - 24.f) * 0.5f; // half-col width
+    const float CW_FIXED = 1100.f - SW;   
+    const float fX  = SW + 32.f;          
+    const float fW  = CW_FIXED - 64.f;    
+    const float fW2 = (fW - 24.f) * 0.5f; 
     const float c1X = fX;
     const float c2X = fX + fW2 + 24.f;
 
-    // ── ALL TextBox objects live OUTSIDE the game loop ───────────────────
-    // Add-University form
     TextBox uniCodeBox(font, {fW,  46.f}, {fX, HH + 108.f});
     TextBox uniNameBox(font, {fW,  46.f}, {fX, HH + 200.f});
     uniCodeBox.setPlaceholder("e.g.  BUET");
     uniNameBox.setPlaceholder("e.g.  Bangladesh University of Engineering");
 
-    // Add-Bus form (two columns)
     TextBox busIdBox   (font, {fW2, 46.f}, {c1X, HH + 108.f});
     TextBox busNameBox (font, {fW2, 46.f}, {c1X, HH + 200.f});
     TextBox busUniBox  (font, {fW2, 46.f}, {c1X, HH + 292.f});
@@ -93,14 +77,13 @@ void AdminDashboardGUI::run()
         auto sz  = window.getSize();
         float ww = static_cast<float>(sz.x);
         float wh = static_cast<float>(sz.y);
-        float CW = ww - SW;   // content area width
-        float CH = wh - HH;   // content area height
+        float CW = ww - SW;   
+        float CH = wh - HH;  
 
-        // Info auto-hide
+      
         if (showInfo && infoTimer.getElapsedTime().asSeconds() > 3.f)
             showInfo = false;
 
-        // Sync TextBox focus each frame (no re-construction!)
         uniCodeBox.setFocused(state == ADD_UNIVERSITY && focusField == 0);
         uniNameBox.setFocused(state == ADD_UNIVERSITY && focusField == 1);
         busIdBox.setFocused   (state == ADD_BUS && focusField == 0);
@@ -109,26 +92,20 @@ void AdminDashboardGUI::run()
         busSeatsBox.setFocused(state == ADD_BUS && focusField == 3);
         busRouteBox.setFocused(state == ADD_BUS && focusField == 4);
 
-        // Form action buttons
+     
         Button saveBtn  (font, "Save",   {160.f, 44.f}, {fX,         HH + 400.f});
         Button cancelBtn(font, "Cancel", {110.f, 44.f}, {fX + 170.f, HH + 400.f}, ButtonStyle::SECONDARY);
         Button saveBusBtn(font, "Save Bus", {160.f, 44.f}, {fX,        HH + 480.f});
         Button cancelBusBtn(font, "Cancel", {110.f, 44.f},{fX + 170.f, HH + 480.f}, ButtonStyle::SECONDARY);
 
-        // Header toolbar buttons
         Button addBtn(font, "+ Add",  {110.f, 36.f}, {ww - 240.f, (HH - 36.f) * 0.5f});
         Button delBtn(font, "Delete", {110.f, 36.f}, {ww - 120.f, (HH - 36.f) * 0.5f},
                       selIdx >= 0 ? ButtonStyle::DANGER : ButtonStyle::SECONDARY);
 
-        // ── Mouse info ────────────────────────────────────────────────────
         auto mp  = sf::Mouse::getPosition(window);
         float mx = static_cast<float>(mp.x);
         float my = static_cast<float>(mp.y);
         bool inContent = mx >= SW && my >= HH;
-
-        // Card geometry for list — taller than before so the larger type has
-        // room; the grid itself is unchanged. University rows are a single
-        // line of content, so they get their own (shorter) height.
         const float CARD_H  = 104.f;
         const float UCARD_H = 76.f;
         const float CARD_GAP= 12.f;
@@ -136,14 +113,14 @@ void AdminDashboardGUI::run()
         const float CARD_W  = CW - 40.f;
         const float LIST_TOP= HH + 20.f;
 
-        // ── Events ───────────────────────────────────────────────────────
+      
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
             Theme::syncViewToWindow(window, *event);
             if (event->is<sf::Event::MouseButtonPressed>())
             {
-                // Sidebar nav
+                
                 if (mx < SW) {
                     for (auto& nav : navItems) {
                         if (my >= nav.y && my < nav.y + 42.f) {
@@ -159,7 +136,6 @@ void AdminDashboardGUI::run()
                         window.close();
                 }
 
-                // Header toolbar (must be before content check)
                 if (my < HH && mx >= SW) {
                     if ((state == VIEW_UNIVERSITIES || state == ADD_UNIVERSITY) &&
                         addBtn.isClicked(window)) {
@@ -195,7 +171,6 @@ void AdminDashboardGUI::run()
                     }
                 }
 
-                // Content area
                 if (inContent) {
                     if (state == VIEW_UNIVERSITIES) {
                         for (int i = 0; i < (int)unis.size(); ++i) {
@@ -216,7 +191,6 @@ void AdminDashboardGUI::run()
                         }
                     }
 
-                    // ADD_UNIVERSITY form
                     if (state == ADD_UNIVERSITY) {
                         if (uniCodeBox.getBounds().contains({mx, my})) { focusField = 0; }
                         if (uniNameBox.getBounds().contains({mx, my})) { focusField = 1; }
@@ -236,8 +210,6 @@ void AdminDashboardGUI::run()
                             uniCodeBox.clear(); uniNameBox.clear();
                         }
                     }
-
-                    // ADD_BUS form
                     if (state == ADD_BUS) {
                         if (busIdBox.getBounds().contains({mx,my}))    focusField = 0;
                         if (busNameBox.getBounds().contains({mx,my}))  focusField = 1;
@@ -268,17 +240,13 @@ void AdminDashboardGUI::run()
                         }
                     }
                 }
-            } // MouseButtonPressed
-
-            // Mouse wheel scroll
+            } 
             if (const auto* mw = event->getIf<sf::Event::MouseWheelScrolled>()) {
                 if (inContent && (state == VIEW_UNIVERSITIES || state == VIEW_BUSES)) {
                     scrollOff -= mw->delta * 36.f;
                     scrollOff  = std::clamp(scrollOff, 0.f, maxScroll);
                 }
             }
-
-            // Text input routing (keys included, for caret movement)
             if (event->is<sf::Event::TextEntered>() ||
                 event->is<sf::Event::KeyPressed>()  ||
                 event->is<sf::Event::MouseButtonPressed>()) {
@@ -296,22 +264,16 @@ void AdminDashboardGUI::run()
                     }
                 }
             }
-        } // pollEvent
-
-        // Update toolbar buttons
+        } 
         addBtn.update(window);
         delBtn.update(window);
         if (state == ADD_UNIVERSITY) { saveBtn.update(window); cancelBtn.update(window); }
         if (state == ADD_BUS)        { saveBusBtn.update(window); cancelBusBtn.update(window); }
 
-        // ═══════════════════════════════════════════════════════════════
-        //  DRAW
-        // ═══════════════════════════════════════════════════════════════
         window.clear(Theme::BG_DARK);
 
-        // ── CONTENT AREA ─────────────────────────────────────────────────
         if (state == DASHBOARD) {
-            // Stat cards
+          
             auto allUnis  = admin.getUniversities();
             auto allBuses = admin.getBuses();
 
@@ -319,7 +281,6 @@ void AdminDashboardGUI::run()
             float scW = (CW - 60.f) * 0.5f;
             float sc1X = SW + 20.f, sc2X = SW + 30.f + scW;
 
-            // Stat card: big bold number, generous gap down to its label
             auto statCard = [&](float x, sf::Color accent, const string& value,
                                 const string& label) {
                 Theme::drawCard(window, {x, scy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
@@ -333,7 +294,6 @@ void AdminDashboardGUI::run()
             statCard(sc1X, Theme::ACCENT, to_string(allUnis.size()),  "UNIVERSITIES");
             statCard(sc2X, Theme::PURPLE, to_string(allBuses.size()), "BUSES");
 
-            // Quick action hint
             Theme::drawText(window, font,
                             "Use the sidebar to manage Universities and Buses.",
                             Theme::Type::META, Theme::TEXT_SECONDARY,
@@ -360,14 +320,12 @@ void AdminDashboardGUI::run()
                 Theme::drawAccentBar(window, CARD_X, cy, UCARD_H,
                                      sel ? Theme::ACCENT_HOVER : Theme::ACCENT);
 
-                // Short title chip — bold, centred, vertically centred in card
                 float badgeW = Theme::drawBadge(
                     window, font, unis[i].first,
                     {CARD_X + 16.f, std::round(cy + (UCARD_H - badgeH) * 0.5f)},
                     Theme::BADGE_UNI_BG, Theme::BADGE_UNI_TEXT,
                     Theme::Type::BADGE_UNI, Theme::BADGE_UNI_EDGE);
 
-                // University full name — measured off the chip, not estimated
                 Theme::drawTextVCentered(window, font, unis[i].second,
                                          Theme::Type::SUBTITLE, Theme::TEXT_PRIMARY,
                                          CARD_X + 16.f + badgeW + 16.f,
@@ -423,27 +381,21 @@ void AdminDashboardGUI::run()
                 const float padL = 16.f;
                 const float rowY = cy + 14.f;
 
-                // Bus ID chip — bold, high contrast
                 float badgeW = Theme::drawBadge(window, font, buses[i].getBusID(),
                                                 {CARD_X + padL, rowY},
                                                 Theme::BADGE_BUS_BG, Theme::BADGE_BUS_TEXT,
                                                 Theme::Type::BADGE_BUS, Theme::BADGE_BUS_EDGE);
-
-                // Bus name — largest and brightest element on the card
                 Theme::drawTextVCentered(window, font, buses[i].getBusName(),
                                          Theme::Type::BUS_NAME, Theme::TEXT_PRIMARY,
                                          CARD_X + padL + badgeW + 16.f,
                                          rowY, badgeH, sf::Text::Bold);
 
-                // University + seat count
                 string secondary = buses[i].getUniversityCode()
                                  + "  ·  " + to_string(buses[i].getTotalSeats()) + " seats";
                 const float metaY = rowY + badgeH + 12.f;
                 Theme::drawText(window, font, secondary, Theme::Type::META,
                                 Theme::TEXT_SECONDARY, {CARD_X + padL, metaY});
 
-                // Route — trimmed to the measured width rather than a fixed
-                // character count, so it never clips mid-glyph
                 string route = Theme::ellipsize(font, buses[i].getRoute(),
                                                 Theme::Type::ROUTE, CARD_W - padL - 24.f);
                 Theme::drawText(window, font, route, Theme::Type::ROUTE,
@@ -481,19 +433,15 @@ void AdminDashboardGUI::run()
             cancelBusBtn.draw(window);
         }
 
-        // ── SIDEBAR (drawn on top to clip content overflow) ───────────────
         {
             sf::RectangleShape sbg({SW, wh});
             sbg.setFillColor(Theme::BG_SIDEBAR);
             window.draw(sbg);
 
-            // Right border
             sf::RectangleShape sborder({1.f, wh});
             sborder.setPosition({SW - 1.f, 0.f});
             sborder.setFillColor(Theme::BORDER_IDLE);
             window.draw(sborder);
-
-            // App name
             Theme::drawTextHCentered(window, font, "Bus Tracker", Theme::Type::SUBTITLE,
                                      Theme::ACCENT, SW * 0.5f, 14.f, sf::Text::Bold);
             Theme::drawTextHCentered(window, font, "ADMIN", Theme::Type::CAPTION,
@@ -501,7 +449,6 @@ void AdminDashboardGUI::run()
 
             Theme::drawSeparator(window, 0.f, 70.f, SW);
 
-            // Nav items
             for (auto& nav : navItems) {
                 bool active = (state == nav.st) ||
                               (nav.st == VIEW_UNIVERSITIES && state == ADD_UNIVERSITY) ||
@@ -519,15 +466,12 @@ void AdminDashboardGUI::run()
                 }
                 if (active)
                     Theme::drawAccentBar(window, 0.f, nav.y, 42.f, Theme::ACCENT);
-
-                // Weight, not just colour, carries the active state
                 Theme::drawTextVCentered(window, font, nav.label, Theme::Type::META,
                                          active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
                                          18.f, nav.y, 42.f,
                                          active ? sf::Text::Bold : sf::Text::Regular);
             }
 
-            // Logout
             bool logHov = mx < SW && my >= wh - 52.f && my < wh - 12.f;
             if (logHov) {
                 sf::RectangleShape lb({SW, 40.f});
@@ -539,8 +483,6 @@ void AdminDashboardGUI::run()
                                      sf::Text::Bold);
             Theme::drawSeparator(window, 0.f, wh - 56.f, SW);
         }
-
-        // ── HEADER BAR (drawn on top) ─────────────────────────────────────
         {
             sf::RectangleShape hbg({ww - SW, HH});
             hbg.setPosition({SW, 0.f});
@@ -560,7 +502,6 @@ void AdminDashboardGUI::run()
                                      Theme::TEXT_PRIMARY, SW + 24.f, 0.f, HH,
                                      sf::Text::Bold);
 
-            // Toolbar buttons (only in list views)
             if (state == VIEW_UNIVERSITIES || state == VIEW_BUSES ||
                 state == ADD_UNIVERSITY    || state == ADD_BUS) {
                 addBtn.draw(window);
@@ -568,8 +509,6 @@ void AdminDashboardGUI::run()
                     delBtn.draw(window);
             }
         }
-
-        // ── Info toast ────────────────────────────────────────────────────
         if (showInfo) {
             float elapsed = infoTimer.getElapsedTime().asSeconds();
             float alpha   = elapsed > 2.f ? 1.f - (elapsed - 2.f) : 1.f;

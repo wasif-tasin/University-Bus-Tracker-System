@@ -21,10 +21,6 @@ void AdminLoginGUI::run()
 
     std::string errorText;
     bool focusUser = true;
-
-    // ── Layout (fixed window — compute once) ──────────────────────────
-    // Card height is even so the centred card lands on integer pixels; a
-    // half-pixel origin here would soften every glyph inside it.
     const float ww = 720.f, wh = 500.f;
     const float cW = std::min(480.f, ww - 60.f);
     const float cH = 376.f;
@@ -32,8 +28,6 @@ void AdminLoginGUI::run()
     const float cY = std::round((wh - cH) * 0.5f);
     const float fX = cX + 28.f;
     const float fW = cW - 56.f;
-
-    // ── TextBox objects live OUTSIDE the game loop so m_value persists ─
     TextBox userBox(font, {fW, 46.f}, {fX, cY + 140.f});
     TextBox passBox(font, {fW, 46.f}, {fX, cY + 220.f});
     userBox.setPlaceholder("Enter username");
@@ -43,16 +37,13 @@ void AdminLoginGUI::run()
 
     while (window.isOpen())
     {
-        // Sync focus state to TextBox objects each frame
         userBox.setFocused(focusUser);
         passBox.setFocused(!focusUser);
 
-        // Buttons are stateless — fine to construct each frame
         Button loginBtn(font, "Login",  {fW * 0.58f, 46.f}, {fX,               cY + 288.f});
         Button backBtn (font, "< Back", {fW * 0.36f, 46.f}, {fX + fW * 0.62f,  cY + 288.f},
                         ButtonStyle::SECONDARY);
 
-        // ── Events ───────────────────────────────────────────────────
         while (const std::optional event = window.pollEvent())
         {
             if (event->is<sf::Event::Closed>()) window.close();
@@ -76,8 +67,6 @@ void AdminLoginGUI::run()
                     }
                 }
                 if (backBtn.isClicked(window)) window.close();
-
-                // Deliver to textboxes for eye-icon click detection
                 userBox.handleEvent(*event);
                 passBox.handleEvent(*event);
             }
@@ -91,8 +80,6 @@ void AdminLoginGUI::run()
 
         loginBtn.update(window);
         backBtn.update(window);
-
-        // ── Draw ─────────────────────────────────────────────────────
         window.clear(Theme::BG_DARK);
         Theme::drawGradientRect(window, {0.f, 0.f}, {ww, wh},
                                 sf::Color(15, 22, 40), sf::Color(10, 15, 28));
