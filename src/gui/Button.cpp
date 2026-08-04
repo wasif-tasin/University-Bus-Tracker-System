@@ -1,52 +1,87 @@
 #include "Button.h"
+#include "Theme.h"
 
-Button::Button(sf::Font& f,
-               const std::string& text,
-               sf::Vector2f size,
-               sf::Vector2f position)
-    : font(f), label(text)
-{
-    box.setSize(size);
-    box.setPosition(position);
-    box.setFillColor(sf::Color(40,120,220));
+#include <algorithm>
+
+Button::Button(sf::Font& f, const std::string& label, sf::Vector2f size,
+               sf::Vector2f pos, ButtonStyle style, float radius)
+    : m_pos(pos), m_size(size), m_font(f), m_label(label),
+      m_style(style), m_radius(radius),
+      m_hoverT(0.f), m_hovered(false), m_pressed(false)
+{}
+
+sf::Color Button::idleColor() const {
+    switch (m_style) {
+        case ButtonStyle::PRIMARY:   return Theme::ACCENT;
+        case ButtonStyle::SECONDARY: return Theme::BG_CARD;
+        case ButtonStyle::DANGER:    return Theme::DANGER;
+        case ButtonStyle::SUCCESS:   return Theme::SUCCESS_DARK;
+        case ButtonStyle::GHOST:     return sf::Color(0, 0, 0, 0);
+    }
+    return Theme::ACCENT;
 }
 
-void Button::draw(sf::RenderWindow& window)
-{
-    window.draw(box);
+sf::Color Button::hoverColor() const {
+    switch (m_style) {
+        case ButtonStyle::PRIMARY:   return Theme::ACCENT_HOVER;
+        case ButtonStyle::SECONDARY: return Theme::ITEM_HOVER;
+        case ButtonStyle::DANGER:    return Theme::DANGER_HOVER;
+        case ButtonStyle::SUCCESS:   return Theme::SUCCESS;
+        case ButtonStyle::GHOST:     return Theme::ITEM_HOVER;
+    }
+    return Theme::ACCENT_HOVER;
+}
 
-    sf::Text txt(font);
+sf::Color Button::pressedColor() const {
+    switch (m_style) {
+        case ButtonStyle::PRIMARY:   return Theme::ACCENT_PRESSED;
+        case ButtonStyle::SECONDARY: return Theme::BG_DARK;
+        case ButtonStyle::DANGER:    return Theme::DANGER_DARK;
+        case ButtonStyle::SUCCESS:   return Theme::SUCCESS_DARK;
+        case ButtonStyle::GHOST:     return Theme::BG_DARK;
+    }
+    return Theme::ACCENT_PRESSED;
+}
 
-    txt.setString(label);
-    txt.setCharacterSize(24);
-    txt.setFillColor(sf::Color::White);
+void Button::draw(sf::RenderWindow& window) {
+    sf::Color fill = m_pressed
+        ? pressedColor()
+        : Theme::lerp(idleColor(), hoverColor(), m_hoverT);
 
-    sf::FloatRect bounds = txt.getLocalBounds();
+    float borderW = 0.f;
+    sf::Color borderC = sf::Color::Transparent;
+    if (m_style == ButtonStyle::SECONDARY || m_style == ButtonStyle::GHOST) {
+        borderW = 1.5f;
+        borderC = Theme::lerp(Theme::BORDER_IDLE, Theme::ACCENT, m_hoverT * 0.6f);
+    }
 
-    txt.setOrigin({bounds.position.x + bounds.size.x / 2.f, bounds.position.y + bounds.size.y / 2.f});
-    txt.setPosition({
-        box.getPosition().x + box.getSize().x / 2.f,
-        box.getPosition().y + box.getSize().y / 2.f
-    });
+    Theme::drawRoundedRect(window, m_pos, m_size, m_radius, fill, borderW, borderC);
 
+    sf::Text txt(m_font);
+    txt.setString(m_label);
+    txt.setCharacterSize(15);
+    txt.setFillColor(Theme::TEXT_PRIMARY);
+    sf::FloatRect b = txt.getLocalBounds();
+    txt.setOrigin({b.position.x + b.size.x * 0.5f,
+                   b.position.y + b.size.y * 0.5f});
+    txt.setPosition(Theme::px(m_pos.x + m_size.x * 0.5f,
+                              m_pos.y + m_size.y * 0.5f));
     window.draw(txt);
 }
 
-void Button::update(sf::RenderWindow& window)
-{
-    auto mouse = window.mapPixelToCoords(
-        sf::Mouse::getPosition(window));
-
-    if (box.getGlobalBounds().contains(mouse))
-        box.setFillColor(sf::Color(70,150,255));
-    else
-        box.setFillColor(sf::Color(40,120,220));
+void Button::update(sf::RenderWindow& window) {
+    auto mouse = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+    m_hovered = sf::FloatRect{m_pos, m_size}.contains(mouse);
+    m_hoverT  = std::clamp(m_hoverT + (m_hovered ? 0.12f : -0.12f), 0.f, 1.f);
+    m_pressed = m_hovered && sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
 }
 
-bool Button::isClicked(sf::RenderWindow& window)
-{
-    auto mouse = window.mapPixelToCoords(
-        sf::Mouse::getPosition(window));
-
-    return box.getGlobalBounds().contains(mouse);
+bool Button::isClicked(sf::RenderWindow& window) {
+    auto mouse = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+    return sf::FloatRect{m_pos, m_size}.contains(mouse);
 }
+
+void Button::setLabel(const std::string& l)  { m_label = l; }
+void Button::setStyle(ButtonStyle s)          { m_style = s; }
+void Button::setPosition(sf::Vector2f p)      { m_pos   = p; }
+sf::FloatRect Button::getBounds() const       { return {m_pos, m_size}; }

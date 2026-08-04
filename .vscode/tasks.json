@@ -18,6 +18,7 @@
                 "${workspaceFolder}/src/gui/GUI.cpp",
                 "${workspaceFolder}/src/gui/Button.cpp",
                 "${workspaceFolder}/src/gui/TextBox.cpp",
+                "${workspaceFolder}/src/gui/UserPanelGUI.cpp",
                 "${workspaceFolder}/src/gui/AdminLoginGUI.cpp",
                 "${workspaceFolder}/src/gui/AdminDashboardGUI.cpp",
                 "${workspaceFolder}/src/gui/UserLoginGUI.cpp",

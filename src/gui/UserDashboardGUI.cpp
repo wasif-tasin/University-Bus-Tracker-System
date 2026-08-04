@@ -1,89 +1,55 @@
 #include "UserDashboardGUI.h"
 #include "Button.h"
 #include "TextBox.h"
+#include "Theme.h"
 #include "User.h"
 #include "Bus.h"
 
 #include <SFML/Graphics.hpp>
-#include <iostream>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 using namespace std;
 
-static std::string wrapRoute(const std::string& route, float maxWidth, const sf::Font& font, unsigned int characterSize, const std::string& prefix = "Route: ")
+// ── Route word-wrap helper ───────────────────────────────────────────────────
+static string wrapRouteU(const string& route, float maxW,
+                          const sf::Font& font, unsigned sz,
+                          const string& prefix = "Route: ")
 {
-    std::string wrapped = prefix;
-    std::string indent(prefix.length(), ' ');
-    std::string currentLine = "";
-    sf::Text tempText(font);
-    tempText.setCharacterSize(characterSize);
+    string wrapped = prefix;
+    string indent(prefix.length(), ' ');
+    string cur;
+    sf::Text tmp(font);
+    tmp.setCharacterSize(sz);
 
-    std::vector<std::string> stops;
-    std::string stop = "";
-    for (char c : route)
-    {
-        if (c == ',')
-        {
-            if (!stop.empty())
-            {
-                stops.push_back(stop);
-                stop = "";
-            }
-        }
-        else
-        {
-            stop += c;
+    vector<string> stops;
+    string s;
+    for (char c : route) {
+        if (c == ',') { if (!s.empty()) { stops.push_back(s); s=""; } }
+        else s += c;
+    }
+    if (!s.empty()) stops.push_back(s);
+
+    for (size_t i = 0; i < stops.size(); ++i) {
+        string st = stops[i];
+        while (!st.empty() && st.front() == ' ') st = st.substr(1);
+        while (!st.empty() && st.back()  == ' ') st.pop_back();
+        string candidate = st + (i < stops.size() - 1 ? ", " : "");
+        tmp.setString(cur + candidate);
+        if (tmp.getLocalBounds().size.x > maxW && !cur.empty()) {
+            wrapped += cur + "\n" + indent;
+            cur = candidate;
+        } else {
+            cur += candidate;
         }
     }
-    if (!stop.empty()) stops.push_back(stop);
-
-    for (size_t i = 0; i < stops.size(); ++i)
-    {
-        std::string s = stops[i];
-        while (!s.empty() && s[0] == ' ') s = s.substr(1);
-        while (!s.empty() && s.back() == ' ') s.pop_back();
-
-        std::string testStop = s + (i < stops.size() - 1 ? ", " : "");
-        tempText.setString(currentLine + testStop);
-        if (tempText.getLocalBounds().size.x > maxWidth)
-        {
-            if (!currentLine.empty())
-            {
-                wrapped += currentLine + "\n" + indent;
-                currentLine = testStop;
-            }
-            else
-            {
-                wrapped += testStop + "\n" + indent;
-                currentLine = "";
-            }
-        }
-        else
-        {
-            currentLine += testStop;
-        }
-    }
-    wrapped += currentLine;
+    wrapped += cur;
     return wrapped;
 }
 
-static std::string formatBusInfo(Bus bus, float maxWidth, const sf::Font& font, unsigned int characterSize, bool includeUni = true)
-{
-    std::string header = bus.getBusID() + " | " + bus.getBusName();
-    if (includeUni)
-    {
-        header += " (" + bus.getUniversityCode() + ")";
-    }
-    header += " | Seats: " + std::to_string(bus.getTotalSeats());
-    
-    std::string routeWrapped = wrapRoute(bus.getRoute(), maxWidth, font, characterSize, "Route: ");
-    
-    return header + "\n" + routeWrapped;
-}
-
-enum UserState
-{
+// ── State ────────────────────────────────────────────────────────────────────
+enum UserState {
     USER_DASHBOARD,
     USER_VIEW_UNIVERSITIES,
     USER_SELECT_UNIVERSITY,
@@ -94,435 +60,430 @@ enum UserState
 
 void UserDashboardGUI::run()
 {
-    sf::RenderWindow window(
-        sf::VideoMode({900, 700}),
-        "User Dashboard");
+    sf::RenderWindow window(sf::VideoMode({1100, 720}),
+                            "University Bus Tracker - User Dashboard");
+    window.setFramerateLimit(60);
 
     sf::Font font;
-    if (!font.openFromFile("assets/Roboto-Regular.ttf"))
-        return;
+    if (!font.openFromFile("assets/Inter-Regular.ttf")) return;
+    Theme::configureFont(font);
 
     User user;
 
-    sf::Text title(font);
-    title.setString("USER DASHBOARD");
-    title.setCharacterSize(34);
-    title.setFillColor(sf::Color::White);
+    UserState state     = USER_DASHBOARD;
+    float     scrollOff = 0.f, maxScroll = 0.f;
 
-    sf::Text infoMsg(font);
-    infoMsg.setCharacterSize(20);
-    infoMsg.setFillColor(sf::Color::Yellow);
+    vector<pair<string,string>> unis;
+    vector<Bus>                 buses;
 
-    Button viewUniBtn(font, "View Universities", {300.f, 50.f}, {300.f, 120.f});
-    Button selectUniBtn(font, "Select University", {300.f, 50.f}, {300.f, 190.f});
-    Button viewAllBusesBtn(font, "View All Buses", {300.f, 50.f}, {300.f, 260.f});
-    Button searchBusBtn(font, "Search Bus by ID", {300.f, 50.f}, {300.f, 330.f});
-    Button searchStopBtn(font, "Search by Stop Name", {300.f, 50.f}, {300.f, 400.f});
-    Button logoutBtn(font, "Logout", {300.f, 50.f}, {300.f, 470.f});
+    string infoText;
+    bool   infoErr  = false, showInfo = false;
+    sf::Clock infoTimer;
+    auto setInfo = [&](const string& msg, bool err) {
+        infoText = msg; infoErr = err; showInfo = true; infoTimer.restart();
+    };
 
-    Button backBtn(font, "Back", {150.f, 50.f}, {375.f, 600.f});
-    Button prevPageBtn(font, "Prev", {100.f, 45.f}, {250.f, 600.f});
-    Button nextPageBtn(font, "Next", {100.f, 45.f}, {550.f, 600.f});
+    // Sidebar layout constants
+    const float SW = 210.f;
+    const float HH = 60.f;
 
-    sf::Text selectUniLabel(font);
-    selectUniLabel.setString("Enter University Code:");
-    selectUniLabel.setCharacterSize(18);
-    selectUniLabel.setFillColor(sf::Color::White);
-    selectUniLabel.setPosition({150.f, 120.f});
-    TextBox selectUniCodeBox(font, {300.f, 45.f}, {150.f, 150.f});
-    Button selectUniSubmit(font, "Search", {150.f, 45.f}, {480.f, 150.f});
+    struct NavItem { string label; UserState st; float y; };
+    const vector<NavItem> navItems = {
+        {"Universities",    USER_VIEW_UNIVERSITIES, 82.f},
+        {"All Buses",       USER_VIEW_BUSES,        132.f},
+        {"By University",   USER_SELECT_UNIVERSITY, 182.f},
+        {"Search Bus ID",   USER_SEARCH_BUS,        232.f},
+        {"Search by Stop",  USER_SEARCH_BY_STOP,    282.f},
+    };
 
-    sf::Text searchBusLabel(font);
-    searchBusLabel.setString("Enter Bus ID:");
-    searchBusLabel.setCharacterSize(18);
-    searchBusLabel.setFillColor(sf::Color::White);
-    searchBusLabel.setPosition({150.f, 120.f});
-    TextBox searchBusIdBox(font, {300.f, 45.f}, {150.f, 150.f});
-    Button searchBusSubmit(font, "Search", {150.f, 45.f}, {480.f, 150.f});
+    // ── Pre-compute search-box layout (fixed window 1100x720) ───────────────
+    const float CW_FIXED = 1100.f - SW;   // 890
+    const float fX_FIX   = SW + 32.f;     // 242
+    const float fW_FIX   = CW_FIXED - 64.f; // 826
+    const float srchW    = fW_FIX * 0.55f;
+    const float srchBtnX = fX_FIX + srchW + 12.f;
 
-    sf::Text searchStopLabel(font);
-    searchStopLabel.setString("Enter Stop Name:");
-    searchStopLabel.setCharacterSize(18);
-    searchStopLabel.setFillColor(sf::Color::White);
-    searchStopLabel.setPosition({150.f, 120.f});
-    TextBox searchStopBox(font, {300.f, 45.f}, {150.f, 150.f});
-    Button searchStopSubmit(font, "Search", {150.f, 45.f}, {480.f, 150.f});
+    // ── Search TextBox objects OUTSIDE the game loop so text persists ───
+    TextBox uniCodeBox(font, {srchW, 44.f}, {fX_FIX, HH + 28.f});
+    TextBox busIdBox  (font, {srchW, 44.f}, {fX_FIX, HH + 28.f});
+    TextBox stopBox   (font, {srchW, 44.f}, {fX_FIX, HH + 28.f});
+    uniCodeBox.setPlaceholder("Enter university code (e.g. BUET)");
+    busIdBox.setPlaceholder  ("Enter Bus ID");
+    stopBox.setPlaceholder   ("Enter stop name");
 
-    UserState state = USER_DASHBOARD;
-    int currentPage = 0;
-    const int itemsPerPage = 8; 
-    const int busesPerPage = 5;
-
-    vector<pair<string, string>> universitiesList;
-    vector<Bus> busesList;
 
     while (window.isOpen())
     {
+        auto sz  = window.getSize();
+        float ww = static_cast<float>(sz.x);
+        float wh = static_cast<float>(sz.y);
+        float CW = ww - SW;
+        float CH = wh - HH;
+
+        if (showInfo && infoTimer.getElapsedTime().asSeconds() > 3.f)
+            showInfo = false;
+
+
+
+        // Sync focus each frame (no re-construction)
+        uniCodeBox.setFocused(state == USER_SELECT_UNIVERSITY);
+        busIdBox.setFocused  (state == USER_SEARCH_BUS);
+        stopBox.setFocused   (state == USER_SEARCH_BY_STOP);
+
+        Button srchUniBtn (font, "Search", {110.f, 44.f}, {srchBtnX, HH + 28.f});
+        Button srchBusBtn (font, "Search", {110.f, 44.f}, {srchBtnX, HH + 28.f});
+        Button srchStopBtn(font, "Search", {110.f, 44.f}, {srchBtnX, HH + 28.f});
+
+
+        // Card geometry
+        const float CARD_H   = 90.f;
+        const float CARD_GAP = 10.f;
+        const float CARD_X   = SW + 20.f;
+        const float CARD_W   = CW - 40.f;
+        const float LIST_TOP = HH + 20.f;
+
+        // Mouse
+        auto mp  = sf::Mouse::getPosition(window);
+        float mx = static_cast<float>(mp.x);
+        float my = static_cast<float>(mp.y);
+        bool inContent = mx >= SW && my >= HH;
+
+        // ── Events ───────────────────────────────────────────────────────
         while (const std::optional event = window.pollEvent())
         {
-            if (event->is<sf::Event::Closed>())
-                window.close();
+            if (event->is<sf::Event::Closed>()) window.close();
 
             if (event->is<sf::Event::MouseButtonPressed>())
             {
-                sf::Vector2i mouse = sf::Mouse::getPosition(window);
-
-                if (state == USER_DASHBOARD)
-                {
-                    if (viewUniBtn.isClicked(window))
-                    {
-                        state = USER_VIEW_UNIVERSITIES;
-                        title.setString("UNIVERSITY LIST");
-                        universitiesList = user.getUniversities();
-                        currentPage = 0;
+                // Sidebar nav
+                if (mx < SW) {
+                    for (auto& nav : navItems) {
+                        if (my >= nav.y && my < nav.y + 42.f) {
+                            state     = nav.st;
+                            scrollOff = 0.f;
+                            buses.clear();
+                            if (state == USER_VIEW_UNIVERSITIES)
+                                unis  = user.getUniversities();
+                            if (state == USER_VIEW_BUSES)
+                                buses = user.getBuses();
+                        }
                     }
-                    else if (selectUniBtn.isClicked(window))
-                    {
-                        state = USER_SELECT_UNIVERSITY;
-                        title.setString("UNIVERSITY BUSES");
-                        selectUniCodeBox.setFocused(true);
-                        busesList.clear();
-                        infoMsg.setString("");
-                    }
-                    else if (viewAllBusesBtn.isClicked(window))
-                    {
-                        state = USER_VIEW_BUSES;
-                        title.setString("ALL BUSES LIST");
-                        busesList = user.getBuses();
-                        currentPage = 0;
-                    }
-                    else if (searchBusBtn.isClicked(window))
-                    {
-                        state = USER_SEARCH_BUS;
-                        title.setString("SEARCH BUS");
-                        searchBusIdBox.setFocused(true);
-                        busesList.clear();
-                        infoMsg.setString("");
-                    }
-                    else if (searchStopBtn.isClicked(window))
-                    {
-                        state = USER_SEARCH_BY_STOP;
-                        title.setString("SEARCH BY STOP");
-                        searchStopBox.setFocused(true);
-                        busesList.clear();
-                        infoMsg.setString("");
-                    }
-                    else if (logoutBtn.isClicked(window))
-                    {
+                    if (my >= wh - 52.f && my < wh - 12.f)
                         window.close();
-                    }
                 }
-                else if (state == USER_VIEW_UNIVERSITIES)
-                {
-                    if (backBtn.isClicked(window))
-                    {
-                        state = USER_DASHBOARD;
-                        title.setString("USER DASHBOARD");
-                    }
-                    else if (currentPage > 0 && prevPageBtn.isClicked(window))
-                    {
-                        currentPage--;
-                    }
-                    else if ((currentPage + 1) * itemsPerPage < universitiesList.size() && nextPageBtn.isClicked(window))
-                    {
-                        currentPage++;
-                    }
-                }
-                else if (state == USER_SELECT_UNIVERSITY)
-                {
-                    if (mouse.x >= 150 && mouse.x <= 450 && mouse.y >= 150 && mouse.y <= 195)
-                        selectUniCodeBox.setFocused(true);
 
-                    if (selectUniSubmit.isClicked(window))
-                    {
-                        busesList = user.getBusesForUniversity(selectUniCodeBox.getText());
-                        currentPage = 0;
-                        if (busesList.empty())
-                            infoMsg.setString("No Buses Found for University: " + selectUniCodeBox.getText());
-                        else
-                            infoMsg.setString("");
+                if (inContent) {
+                    // Search triggers
+                    if (state == USER_SELECT_UNIVERSITY && srchUniBtn.isClicked(window)) {
+                        buses = user.getBusesForUniversity(uniCodeBox.getText());
+                        scrollOff = 0.f;
+                        if (buses.empty()) setInfo("No buses found for: " + uniCodeBox.getText(), true);
                     }
-                    else if (backBtn.isClicked(window))
-                    {
-                        state = USER_DASHBOARD;
-                        title.setString("USER DASHBOARD");
+                    if (state == USER_SEARCH_BUS && srchBusBtn.isClicked(window)) {
+                        buses = user.searchBus(busIdBox.getText());
+                        scrollOff = 0.f;
+                        if (buses.empty()) setInfo("Bus not found: " + busIdBox.getText(), true);
                     }
-                    else if (currentPage > 0 && prevPageBtn.isClicked(window))
-                    {
-                        currentPage--;
-                    }
-                    else if ((currentPage + 1) * busesPerPage < busesList.size() && nextPageBtn.isClicked(window))
-                    {
-                        currentPage++;
-                    }
-                }
-                else if (state == USER_VIEW_BUSES)
-                {
-                    if (backBtn.isClicked(window))
-                    {
-                        state = USER_DASHBOARD;
-                        title.setString("USER DASHBOARD");
-                    }
-                    else if (currentPage > 0 && prevPageBtn.isClicked(window))
-                    {
-                        currentPage--;
-                    }
-                    else if ((currentPage + 1) * busesPerPage < busesList.size() && nextPageBtn.isClicked(window))
-                    {
-                        currentPage++;
-                    }
-                }
-                else if (state == USER_SEARCH_BUS)
-                {
-                    if (mouse.x >= 150 && mouse.x <= 450 && mouse.y >= 150 && mouse.y <= 195)
-                        searchBusIdBox.setFocused(true);
-
-                    if (searchBusSubmit.isClicked(window))
-                    {
-                        busesList = user.searchBus(searchBusIdBox.getText());
-                        currentPage = 0;
-                        if (busesList.empty())
-                            infoMsg.setString("Bus Not Found: " + searchBusIdBox.getText());
-                        else
-                            infoMsg.setString("");
-                    }
-                    else if (backBtn.isClicked(window))
-                    {
-                        state = USER_DASHBOARD;
-                        title.setString("USER DASHBOARD");
-                    }
-                }
-                else if (state == USER_SEARCH_BY_STOP)
-                {
-                    if (mouse.x >= 150 && mouse.x <= 450 && mouse.y >= 150 && mouse.y <= 195)
-                        searchStopBox.setFocused(true);
-
-                    if (searchStopSubmit.isClicked(window))
-                    {
-                        busesList = user.searchByStop(searchStopBox.getText());
-                        currentPage = 0;
-                        if (busesList.empty())
-                            infoMsg.setString("No Buses Found containing stop: " + searchStopBox.getText());
-                        else
-                            infoMsg.setString("");
-                    }
-                    else if (backBtn.isClicked(window))
-                    {
-                        state = USER_DASHBOARD;
-                        title.setString("USER DASHBOARD");
-                    }
-                    else if (currentPage > 0 && prevPageBtn.isClicked(window))
-                    {
-                        currentPage--;
-                    }
-                    else if ((currentPage + 1) * busesPerPage < busesList.size() && nextPageBtn.isClicked(window))
-                    {
-                        currentPage++;
+                    if (state == USER_SEARCH_BY_STOP && srchStopBtn.isClicked(window)) {
+                        buses = user.searchByStop(stopBox.getText());
+                        scrollOff = 0.f;
+                        if (buses.empty()) setInfo("No buses pass through: " + stopBox.getText(), true);
                     }
                 }
             }
 
-            if (event->is<sf::Event::TextEntered>())
-            {
-                if (state == USER_SELECT_UNIVERSITY)
-                    selectUniCodeBox.handleEvent(*event);
-                else if (state == USER_SEARCH_BUS)
-                    searchBusIdBox.handleEvent(*event);
-                else if (state == USER_SEARCH_BY_STOP)
-                    searchStopBox.handleEvent(*event);
+            if (const auto* mw = event->getIf<sf::Event::MouseWheelScrolled>()) {
+                if (inContent) {
+                    scrollOff -= mw->delta * 36.f;
+                    scrollOff  = std::clamp(scrollOff, 0.f, maxScroll);
+                }
+            }
+
+            if (event->is<sf::Event::TextEntered>()) {
+                if (state == USER_SELECT_UNIVERSITY) uniCodeBox.handleEvent(*event);
+                if (state == USER_SEARCH_BUS)        busIdBox.handleEvent(*event);
+                if (state == USER_SEARCH_BY_STOP)    stopBox.handleEvent(*event);
             }
         }
 
-        if (state == USER_DASHBOARD)
+        srchUniBtn.update(window);
+        srchBusBtn.update(window);
+        srchStopBtn.update(window);
+
+        // ═══════════════════════════════════════════════════════════════
+        //  DRAW
+        // ═══════════════════════════════════════════════════════════════
+        window.clear(Theme::BG_DARK);
+
+        // ── Helper: draw a bus card ───────────────────────────────────────
+        auto drawBusCard = [&](Bus b, float cx, float cy,
+                               float cardW, bool hov, bool includeUni)
         {
-            viewUniBtn.update(window);
-            selectUniBtn.update(window);
-            viewAllBusesBtn.update(window);
-            searchBusBtn.update(window);
-            searchStopBtn.update(window);
-            logoutBtn.update(window);
+            sf::Color bg = hov ? Theme::ITEM_HOVER : Theme::ITEM_BG;
+            Theme::drawCard(window, {cx, cy}, {cardW, CARD_H}, bg, 8.f);
+            Theme::drawAccentBar(window, cx, cy, CARD_H, Theme::PURPLE);
+
+            // ID badge — high contrast
+            Theme::drawBadge(window, font, b.getBusID(),
+                             {cx + 14.f, cy + 8.f},
+                             Theme::withAlpha(Theme::PURPLE, 90), sf::Color(220, 200, 255));
+
+            // Bus name — primary, large
+            sf::Text nm(font); nm.setString(b.getBusName());
+            nm.setCharacterSize(16); nm.setFillColor(Theme::TEXT_PRIMARY);
+            nm.setPosition(Theme::px(cx + 14.f, cy + 30.f));
+            window.draw(nm);
+
+            // Secondary: uni code + seats
+            string secondary = includeUni ? b.getUniversityCode() + "  ·  " : "";
+            secondary += to_string(b.getTotalSeats()) + " seats";
+            sf::Text sec(font); sec.setString(secondary);
+            sec.setCharacterSize(12); sec.setFillColor(Theme::TEXT_SECONDARY);
+            sec.setPosition(Theme::px(cx + 14.f, cy + 50.f));
+            window.draw(sec);
+
+            // Route — brighter gray for readability
+            string wrappedRoute = wrapRouteU(b.getRoute(), cardW - 30.f, font, 12, "");
+            sf::Text rt(font); rt.setString(wrappedRoute);
+            rt.setCharacterSize(12); rt.setFillColor(sf::Color(140, 155, 175));
+            rt.setPosition(Theme::px(cx + 14.f, cy + 66.f));
+            window.draw(rt);
+        };
+
+        // ── Content ──────────────────────────────────────────────────────
+        if (state == USER_DASHBOARD) {
+            auto allUnis  = user.getUniversities();
+            auto allBuses = user.getBuses();
+
+            float scy = HH + 30.f;
+            float scW = (CW - 60.f) * 0.5f;
+            float sc1X = SW + 20.f, sc2X = SW + 30.f + scW;
+
+            Theme::drawCard(window, {sc1X, scy}, {scW, 108.f}, Theme::BG_CARD, 12.f);
+            Theme::drawAccentBar(window, sc1X, scy, 108.f, Theme::ACCENT, 5.f);
+            sf::Text n1(font); n1.setString(to_string(allUnis.size()));
+            n1.setCharacterSize(44); n1.setFillColor(Theme::ACCENT);
+            sf::FloatRect b1 = n1.getLocalBounds();
+            n1.setPosition(Theme::px(sc1X + 22.f, scy + 14.f - b1.position.y));
+            window.draw(n1);
+            sf::Text l1(font); l1.setString("UNIVERSITIES");
+            l1.setCharacterSize(11); l1.setFillColor(Theme::TEXT_SECONDARY);
+            l1.setPosition(Theme::px(sc1X + 22.f, scy + 78.f));
+            window.draw(l1);
+
+            Theme::drawCard(window, {sc2X, scy}, {scW, 108.f}, Theme::BG_CARD, 12.f);
+            Theme::drawAccentBar(window, sc2X, scy, 108.f, Theme::PURPLE, 5.f);
+            sf::Text n2(font); n2.setString(to_string(allBuses.size()));
+            n2.setCharacterSize(44); n2.setFillColor(Theme::PURPLE);
+            sf::FloatRect b2 = n2.getLocalBounds();
+            n2.setPosition(Theme::px(sc2X + 22.f, scy + 14.f - b2.position.y));
+            window.draw(n2);
+            sf::Text l2(font); l2.setString("BUSES");
+            l2.setCharacterSize(11); l2.setFillColor(Theme::TEXT_SECONDARY);
+            l2.setPosition(Theme::px(sc2X + 22.f, scy + 78.f));
+            window.draw(l2);
+
+            sf::Text hint(font);
+            hint.setString("Use the sidebar to browse universities and bus routes.");
+            hint.setCharacterSize(13); hint.setFillColor(Theme::TEXT_MUTED);
+            hint.setPosition(Theme::px(SW + 22.f, scy + 132.f));
+            window.draw(hint);
         }
-        else
-        {
-            backBtn.update(window);
-            prevPageBtn.update(window);
-            nextPageBtn.update(window);
+        else if (state == USER_VIEW_UNIVERSITIES) {
+            float totalH = unis.size() * (65.f + CARD_GAP);
+            maxScroll = max(0.f, totalH - CH + 40.f);
+            scrollOff = clamp(scrollOff, 0.f, maxScroll);
 
-            if (state == USER_SELECT_UNIVERSITY) selectUniSubmit.update(window);
-            else if (state == USER_SEARCH_BUS) searchBusSubmit.update(window);
-            else if (state == USER_SEARCH_BY_STOP) searchStopSubmit.update(window);
+            for (int i = 0; i < (int)unis.size(); ++i) {
+                float cy = LIST_TOP + i * (65.f + CARD_GAP) - scrollOff;
+                if (cy + 65.f < HH || cy > wh) continue;
+                bool hov = inContent && my >= cy && my < cy + 65.f;
+                sf::Color bg = hov ? Theme::ITEM_HOVER : Theme::ITEM_BG;
+                Theme::drawCard(window, {CARD_X, cy}, {CARD_W, 65.f}, bg, 8.f);
+                Theme::drawAccentBar(window, CARD_X, cy, 65.f, Theme::ACCENT);
+
+                // Badge — high contrast
+                Theme::drawBadge(window, font, unis[i].first,
+                                 {CARD_X + 14.f, cy + (65.f - 28.f) * 0.5f},
+                                 Theme::withAlpha(Theme::ACCENT, 90), sf::Color(220, 235, 255));
+
+                float badgeW = static_cast<float>(unis[i].first.size()) * 8.5f + 32.f;
+                sf::Text nm(font); nm.setString(unis[i].second);
+                nm.setCharacterSize(15); nm.setFillColor(Theme::TEXT_PRIMARY);
+                sf::FloatRect bn = nm.getLocalBounds();
+                nm.setPosition(Theme::px(CARD_X + 14.f + badgeW + 14.f,
+                                         cy + (65.f - bn.size.y) * 0.5f - bn.position.y));
+                window.draw(nm);
+            }
+            if (unis.empty()) {
+                Theme::drawCenteredText(window, font, "No universities registered.",
+                                        16, Theme::TEXT_MUTED,
+                                        {{SW + 20.f, HH + 80.f}, {CW - 40.f, 60.f}});
+            }
+        }
+        else if (state == USER_VIEW_BUSES) {
+            float totalH = buses.size() * (CARD_H + CARD_GAP);
+            maxScroll = max(0.f, totalH - CH + 40.f);
+            scrollOff = clamp(scrollOff, 0.f, maxScroll);
+
+            for (int i = 0; i < (int)buses.size(); ++i) {
+                float cy = LIST_TOP + i * (CARD_H + CARD_GAP) - scrollOff;
+                if (cy + CARD_H < HH || cy > wh) continue;
+                bool hov = inContent && my >= cy && my < cy + CARD_H;
+                drawBusCard(buses[i], CARD_X, cy, CARD_W, hov, true);
+            }
+            if (buses.empty()) {
+                Theme::drawCenteredText(window, font, "No buses registered.",
+                                        16, Theme::TEXT_MUTED,
+                                        {{SW + 20.f, HH + 80.f}, {CW - 40.f, 60.f}});
+            }
+        }
+        else if (state == USER_SELECT_UNIVERSITY) {
+            uniCodeBox.draw(window);
+            srchUniBtn.draw(window);
+
+            float listTop = HH + 92.f;
+            float totalH  = buses.size() * (CARD_H + CARD_GAP);
+            maxScroll = max(0.f, totalH - (CH - 90.f) + 40.f);
+            scrollOff = clamp(scrollOff, 0.f, maxScroll);
+
+            for (int i = 0; i < (int)buses.size(); ++i) {
+                float cy = listTop + i * (CARD_H + CARD_GAP) - scrollOff;
+                if (cy + CARD_H < HH || cy > wh) continue;
+                bool hov = inContent && my >= cy && my < cy + CARD_H;
+                drawBusCard(buses[i], CARD_X, cy, CARD_W, hov, false);
+            }
+        }
+        else if (state == USER_SEARCH_BUS) {
+            busIdBox.draw(window);
+            srchBusBtn.draw(window);
+
+            if (!buses.empty()) {
+                // Show full detail card for the matched bus
+                auto b = buses[0];
+                float cy = HH + 92.f;
+                Theme::drawCard(window, {CARD_X, cy}, {CARD_W, 200.f}, Theme::ITEM_BG, 10.f);
+                Theme::drawAccentBar(window, CARD_X, cy, 200.f, Theme::PURPLE, 4.f);
+
+                auto row = [&](const string& lbl, const string& val, float ry) {
+                    sf::Text lt(font); lt.setString(lbl);
+                    lt.setCharacterSize(12); lt.setFillColor(Theme::TEXT_MUTED);
+                    lt.setPosition({CARD_X + 18.f, cy + ry}); window.draw(lt);
+                    sf::Text vt(font); vt.setString(val);
+                    vt.setCharacterSize(15); vt.setFillColor(Theme::TEXT_PRIMARY);
+                    vt.setPosition({CARD_X + 148.f, cy + ry - 2.f}); window.draw(vt);
+                };
+                row("Bus ID",     b.getBusID(),                          14.f);
+                row("Name",       b.getBusName(),                        42.f);
+                row("University", b.getUniversityCode(),                 70.f);
+                row("Seats",      to_string(b.getTotalSeats()),          98.f);
+
+                string wrappedRoute = wrapRouteU(b.getRoute(), CARD_W - 170.f, font, 14);
+                row("Route", wrappedRoute, 126.f);
+            }
+        }
+        else if (state == USER_SEARCH_BY_STOP) {
+            stopBox.draw(window);
+            srchStopBtn.draw(window);
+
+            float listTop = HH + 92.f;
+            float totalH  = buses.size() * (CARD_H + CARD_GAP);
+            maxScroll = max(0.f, totalH - (CH - 90.f) + 40.f);
+            scrollOff = clamp(scrollOff, 0.f, maxScroll);
+
+            for (int i = 0; i < (int)buses.size(); ++i) {
+                float cy = listTop + i * (CARD_H + CARD_GAP) - scrollOff;
+                if (cy + CARD_H < HH || cy > wh) continue;
+                bool hov = inContent && my >= cy && my < cy + CARD_H;
+                drawBusCard(buses[i], CARD_X, cy, CARD_W, hov, true);
+            }
         }
 
-        window.clear(sf::Color(30, 45, 55)); 
-
-        sf::FloatRect titleBounds = title.getLocalBounds();
-        title.setOrigin({titleBounds.position.x + titleBounds.size.x / 2.f, 0.f});
-        title.setPosition({450.f, 40.f}); 
-
-        window.draw(title);
-
-        if (state == USER_DASHBOARD)
+        // ── SIDEBAR ───────────────────────────────────────────────────────
         {
-            viewUniBtn.draw(window);
-            selectUniBtn.draw(window);
-            viewAllBusesBtn.draw(window);
-            searchBusBtn.draw(window);
-            searchStopBtn.draw(window);
-            logoutBtn.draw(window);
+            sf::RectangleShape sbg({SW, wh});
+            sbg.setFillColor(Theme::BG_SIDEBAR); window.draw(sbg);
+            sf::RectangleShape sbd({1.f, wh});
+            sbd.setPosition({SW - 1.f, 0.f});
+            sbd.setFillColor(Theme::BORDER_IDLE); window.draw(sbd);
+
+            sf::Text an(font); an.setString("Bus Tracker");
+            an.setCharacterSize(16); an.setFillColor(Theme::ACCENT);
+            sf::FloatRect ab = an.getLocalBounds();
+            an.setOrigin({ab.position.x + ab.size.x * 0.5f, 0.f});
+            an.setPosition({SW * 0.5f, 16.f}); window.draw(an);
+            sf::Text ro(font); ro.setString("User");
+            ro.setCharacterSize(11); ro.setFillColor(Theme::TEXT_MUTED);
+            sf::FloatRect rb = ro.getLocalBounds();
+            ro.setOrigin({rb.position.x + rb.size.x * 0.5f, 0.f});
+            ro.setPosition({SW * 0.5f, 36.f}); window.draw(ro);
+
+            Theme::drawSeparator(window, 0.f, 70.f, SW);
+
+            for (auto& nav : navItems) {
+                bool active = (state == nav.st);
+                bool hov    = mx < SW && my >= nav.y && my < nav.y + 42.f;
+                sf::Color ibg = active ? Theme::SIDEBAR_SELECTED
+                              : hov   ? Theme::SIDEBAR_HOVER
+                              : sf::Color(0,0,0,0);
+                if (active || hov) {
+                    sf::RectangleShape ib({SW, 42.f});
+                    ib.setPosition({0.f, nav.y}); ib.setFillColor(ibg);
+                    window.draw(ib);
+                }
+                if (active) Theme::drawAccentBar(window, 0.f, nav.y, 42.f, Theme::ACCENT);
+
+                sf::Text nt(font); nt.setString(nav.label);
+                nt.setCharacterSize(13);
+                nt.setFillColor(active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY);
+                sf::FloatRect nb = nt.getLocalBounds();
+                nt.setPosition({16.f, nav.y + (42.f - nb.size.y) * 0.5f - nb.position.y});
+                window.draw(nt);
+            }
+
+            // Logout
+            bool lh = mx < SW && my >= wh - 52.f && my < wh - 12.f;
+            if (lh) {
+                sf::RectangleShape lb({SW, 40.f});
+                lb.setPosition({0.f, wh - 52.f}); lb.setFillColor(Theme::SIDEBAR_HOVER);
+                window.draw(lb);
+            }
+            Theme::drawSeparator(window, 0.f, wh - 56.f, SW);
+            sf::Text lt(font); lt.setString("Logout");
+            lt.setCharacterSize(14); lt.setFillColor(Theme::DANGER);
+            sf::FloatRect ltb = lt.getLocalBounds();
+            lt.setPosition({16.f, wh - 52.f + (40.f - ltb.size.y) * 0.5f - ltb.position.y});
+            window.draw(lt);
         }
-        else
+
+        // ── HEADER BAR ────────────────────────────────────────────────────
         {
-            backBtn.draw(window);
+            sf::RectangleShape hbg({ww - SW, HH});
+            hbg.setPosition({SW, 0.f}); hbg.setFillColor(Theme::BG_HEADER);
+            window.draw(hbg);
+            sf::RectangleShape hl({ww - SW, 1.5f});
+            hl.setPosition({SW, HH - 1.5f}); hl.setFillColor(Theme::ACCENT);
+            window.draw(hl);
 
-            if (state == USER_VIEW_UNIVERSITIES)
-            {
-                if (universitiesList.empty())
-                {
-                    sf::Text row(font, "No Universities Registered.", 22);
-                    row.setFillColor(sf::Color::Yellow);
-                    row.setPosition({300.f, 200.f});
-                    window.draw(row);
-                }
-                else
-                {
-                    int startIdx = currentPage * itemsPerPage;
-                    int endIdx = min(startIdx + itemsPerPage, (int)universitiesList.size());
-                    float currentY = 120.f;
+            string pageTitle = "Dashboard";
+            if (state == USER_VIEW_UNIVERSITIES) pageTitle = "Universities";
+            else if (state == USER_VIEW_BUSES)    pageTitle = "All Buses";
+            else if (state == USER_SELECT_UNIVERSITY) pageTitle = "Buses by University";
+            else if (state == USER_SEARCH_BUS)    pageTitle = "Search Bus";
+            else if (state == USER_SEARCH_BY_STOP) pageTitle = "Search by Stop";
 
-                    for (int i = startIdx; i < endIdx; ++i)
-                    {
-                        sf::Text row(font, universitiesList[i].first + "  -  " + universitiesList[i].second, 22);
-                        row.setFillColor(sf::Color::White);
-                        row.setPosition({150.f, currentY});
-                        window.draw(row);
-                        currentY += 45.f;
-                    }
+            sf::Text pt(font); pt.setString(pageTitle);
+            pt.setCharacterSize(17); pt.setFillColor(Theme::TEXT_PRIMARY);
+            sf::FloatRect pb = pt.getLocalBounds();
+            pt.setPosition({SW + 22.f, (HH - pb.size.y) * 0.5f - pb.position.y});
+            window.draw(pt);
+        }
 
-                    if (currentPage > 0) prevPageBtn.draw(window);
-                    if (endIdx < (int)universitiesList.size()) nextPageBtn.draw(window);
-                }
-            }
-            else if (state == USER_SELECT_UNIVERSITY)
-            {
-                window.draw(selectUniLabel);
-                selectUniCodeBox.draw(window);
-                selectUniSubmit.draw(window);
-
-                if (!infoMsg.getString().isEmpty())
-                {
-                    infoMsg.setPosition({150.f, 210.f});
-                    window.draw(infoMsg);
-                }
-                else
-                {
-                    int startIdx = currentPage * busesPerPage;
-                    int endIdx = min(startIdx + busesPerPage, (int)busesList.size());
-                    float currentY = 220.f;
-
-                    for (int i = startIdx; i < endIdx; ++i)
-                    {
-                        string info = formatBusInfo(busesList[i], 780.f, font, 18, false);
-                        sf::Text row(font, info, 18);
-                        row.setFillColor(sf::Color::White);
-                        row.setPosition({80.f, currentY});
-                        window.draw(row);
-                        currentY += 65.f;
-                    }
-
-                    if (currentPage > 0) prevPageBtn.draw(window);
-                    if (endIdx < (int)busesList.size()) nextPageBtn.draw(window);
-                }
-            }
-            else if (state == USER_VIEW_BUSES)
-            {
-                if (busesList.empty())
-                {
-                    sf::Text row(font, "No Buses Registered.", 22);
-                    row.setFillColor(sf::Color::Yellow);
-                    row.setPosition({300.f, 200.f});
-                    window.draw(row);
-                }
-                else
-                {
-                    int startIdx = currentPage * busesPerPage;
-                    int endIdx = min(startIdx + busesPerPage, (int)busesList.size());
-                    float currentY = 120.f;
-
-                    for (int i = startIdx; i < endIdx; ++i)
-                    {
-                        string info = formatBusInfo(busesList[i], 780.f, font, 18, true);
-                        sf::Text row(font, info, 18);
-                        row.setFillColor(sf::Color::White);
-                        row.setPosition({80.f, currentY});
-                        window.draw(row);
-                        currentY += 65.f;
-                    }
-
-                    if (currentPage > 0) prevPageBtn.draw(window);
-                    if (endIdx < (int)busesList.size()) nextPageBtn.draw(window);
-                }
-            }
-            else if (state == USER_SEARCH_BUS)
-            {
-                window.draw(searchBusLabel);
-                searchBusIdBox.draw(window);
-                searchBusSubmit.draw(window);
-
-                if (!infoMsg.getString().isEmpty())
-                {
-                    infoMsg.setPosition({150.f, 210.f});
-                    window.draw(infoMsg);
-                }
-                else if (!busesList.empty())
-                {
-                    float currentY = 220.f;
-                    string info1 = "Bus ID      : " + busesList[0].getBusID();
-                    string info2 = "Bus Name    : " + busesList[0].getBusName();
-                    string info3 = "University  : " + busesList[0].getUniversityCode();
-                    string info4 = "Total Seats : " + to_string(busesList[0].getTotalSeats());
-                    string info5 = wrapRoute(busesList[0].getRoute(), 710.f, font, 20, "Route       : ");
-
-                    string fullInfo = info1 + "\n" + info2 + "\n" + info3 + "\n" + info4 + "\n" + info5;
-
-                    sf::Text row(font, fullInfo, 20);
-                    row.setFillColor(sf::Color::White);
-                    row.setPosition({150.f, currentY});
-                    window.draw(row);
-                }
-            }
-            else if (state == USER_SEARCH_BY_STOP)
-            {
-                window.draw(searchStopLabel);
-                searchStopBox.draw(window);
-                searchStopSubmit.draw(window);
-
-                if (!infoMsg.getString().isEmpty())
-                {
-                    infoMsg.setPosition({150.f, 210.f});
-                    window.draw(infoMsg);
-                }
-                else
-                {
-                    int startIdx = currentPage * busesPerPage;
-                    int endIdx = min(startIdx + busesPerPage, (int)busesList.size());
-                    float currentY = 220.f;
-
-                    for (int i = startIdx; i < endIdx; ++i)
-                    {
-                        string header = busesList[i].getBusID() + " | " + busesList[i].getBusName() + " (" + busesList[i].getUniversityCode() + ")";
-                        string routeWrapped = wrapRoute(busesList[i].getRoute(), 780.f, font, 18, "Route: ");
-                        string info = header + "\n" + routeWrapped;
-                        sf::Text row(font, info, 18);
-                        row.setFillColor(sf::Color::White);
-                        row.setPosition({80.f, currentY});
-                        window.draw(row);
-                        currentY += 65.f;
-                    }
-
-                    if (currentPage > 0) prevPageBtn.draw(window);
-                    if (endIdx < (int)busesList.size()) nextPageBtn.draw(window);
-                }
-            }
+        // ── Toast ─────────────────────────────────────────────────────────
+        if (showInfo) {
+            float elapsed = infoTimer.getElapsedTime().asSeconds();
+            float alpha   = elapsed > 2.f ? 1.f - (elapsed - 2.f) : 1.f;
+            Theme::drawInfoToast(window, font, infoText, infoErr, ww, wh, alpha);
         }
 
         window.display();
