@@ -6,26 +6,25 @@
 #include <SFML/Graphics.hpp>
 #include <algorithm>
 
-namespace {
-constexpr float CARD_H    = 424.f;
-constexpr float Y_ICON    = 46.f;
-constexpr float Y_TITLE   = 78.f;
-constexpr float Y_SUB     = 110.f;
-constexpr float Y_RULE    = 138.f;
-constexpr float Y_LABEL1  = 156.f;
-constexpr float Y_FIELD1  = 176.f;
-constexpr float Y_LABEL2  = 236.f;
-constexpr float Y_FIELD2  = 256.f;
-constexpr float Y_HINT    = 310.f;
-constexpr float Y_BUTTONS = 336.f;
-constexpr float Y_INFO    = 394.f;
-constexpr float FIELD_H   = 46.f;
+namespace
+{
+    constexpr float CARD_H = 424.f;
+    constexpr float Y_ICON = 46.f;
+    constexpr float Y_TITLE = 78.f;
+    constexpr float Y_SUB = 110.f;
+    constexpr float Y_RULE = 138.f;
+    constexpr float Y_LABEL1 = 156.f;
+    constexpr float Y_FIELD1 = 176.f;
+    constexpr float Y_LABEL2 = 236.f;
+    constexpr float Y_FIELD2 = 256.f;
+    constexpr float Y_HINT = 310.f;
+    constexpr float Y_BUTTONS = 336.f;
+    constexpr float Y_INFO = 394.f;
+    constexpr float FIELD_H = 46.f;
 }
 
-UserRegistrationScreen::UserRegistrationScreen(sf::Font& font)
-    : m_font(font)
-    , m_emailBox(font, {100.f, FIELD_H}, {0.f, 0.f})
-    , m_passBox(font, {100.f, FIELD_H}, {0.f, 0.f})
+UserRegistrationScreen::UserRegistrationScreen(sf::Font &font)
+    : m_font(font), m_emailBox(font, {100.f, FIELD_H}, {0.f, 0.f}), m_passBox(font, {100.f, FIELD_H}, {0.f, 0.f})
 {
     m_emailBox.setPlaceholder("yourname@gmail.com");
     m_passBox.setPlaceholder("Choose a password");
@@ -42,8 +41,10 @@ void UserRegistrationScreen::onEnter()
 
 void UserRegistrationScreen::step(int delta)
 {
-    if (m_focus == F_NONE) m_focus = (delta > 0) ? 0 : F_COUNT - 1;
-    else                   m_focus = (m_focus + delta + F_COUNT) % F_COUNT;
+    if (m_focus == F_NONE)
+        m_focus = (delta > 0) ? 0 : F_COUNT - 1;
+    else
+        m_focus = (m_focus + delta + F_COUNT) % F_COUNT;
 }
 
 void UserRegistrationScreen::submit()
@@ -83,7 +84,7 @@ void UserRegistrationScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
     m_passBox.setFocused(m_focus == F_PASS);
 }
 
-void UserRegistrationScreen::handleEvent(const sf::Event& event)
+void UserRegistrationScreen::handleEvent(const sf::Event &event)
 {
     const float cW = std::min(480.f, m_size.x - 60.f);
     const float cH = CARD_H;
@@ -97,15 +98,19 @@ void UserRegistrationScreen::handleEvent(const sf::Event& event)
 
     if (event.is<sf::Event::MouseButtonPressed>())
     {
-        if (m_emailBox.getBounds().contains(m_mouse)) m_focus = F_EMAIL;
-        if (m_passBox.getBounds().contains(m_mouse))  m_focus = F_PASS;
+        if (m_emailBox.getBounds().contains(m_mouse))
+            m_focus = F_EMAIL;
+        if (m_passBox.getBounds().contains(m_mouse))
+            m_focus = F_PASS;
 
-        if (regRect.contains(m_mouse)) {
+        if (regRect.contains(m_mouse))
+        {
             m_focus = F_REGISTER;
             submit();
             return;
         }
-        if (backRect.contains(m_mouse)) {
+        if (backRect.contains(m_mouse))
+        {
             m_app->pop();
             return;
         }
@@ -114,58 +119,69 @@ void UserRegistrationScreen::handleEvent(const sf::Event& event)
         m_passBox.handleEvent(event);
     }
 
-    if (const auto* kp = event.getIf<sf::Event::KeyPressed>())
+    if (const auto *kp = event.getIf<sf::Event::KeyPressed>())
     {
         using Key = sf::Keyboard::Key;
         bool consumed = true;
 
         switch (kp->code)
         {
-            case Key::Enter:
-                if      (m_focus == F_NONE)  m_focus = F_EMAIL;
-                else if (m_focus == F_EMAIL) m_focus = F_PASS;
-                else if (m_focus == F_BACK)  m_app->pop();
-                else                         submit();
-                break;
-
-            case Key::Tab:
-                step(kp->shift ? -1 : 1);
-                break;
-
-            case Key::Down:
-                step(1);
-                break;
-
-            case Key::Up:
-                step(-1);
-                break;
-
-            case Key::Left:
-                if (m_focus == F_BACK) m_focus = F_REGISTER;
-                else                   consumed = false;
-                break;
-
-            case Key::Right:
-                if (m_focus == F_REGISTER) m_focus = F_BACK;
-                else                       consumed = false;
-                break;
-
-            case Key::Escape:
+        case Key::Enter:
+            if (m_focus == F_NONE)
+                m_focus = F_EMAIL;
+            else if (m_focus == F_EMAIL)
+                m_focus = F_PASS;
+            else if (m_focus == F_BACK)
                 m_app->pop();
-                break;
+            else
+                submit();
+            break;
 
-            default:
+        case Key::Tab:
+            step(kp->shift ? -1 : 1);
+            break;
+
+        case Key::Down:
+            step(1);
+            break;
+
+        case Key::Up:
+            step(-1);
+            break;
+
+        case Key::Left:
+            if (m_focus == F_BACK)
+                m_focus = F_REGISTER;
+            else
                 consumed = false;
-                break;
+            break;
+
+        case Key::Right:
+            if (m_focus == F_REGISTER)
+                m_focus = F_BACK;
+            else
+                consumed = false;
+            break;
+
+        case Key::Escape:
+            m_app->pop();
+            break;
+
+        default:
+            consumed = false;
+            break;
         }
 
-        if (consumed) return;
+        if (consumed)
+            return;
     }
 
     if (event.is<sf::Event::TextEntered>() || event.is<sf::Event::KeyPressed>())
     {
-        if      (m_focus == F_EMAIL) m_emailBox.handleEvent(event);
-        else if (m_focus == F_PASS)  m_passBox.handleEvent(event);
+        if (m_focus == F_EMAIL)
+            m_emailBox.handleEvent(event);
+        else if (m_focus == F_PASS)
+            m_passBox.handleEvent(event);
     }
 }
 
@@ -179,10 +195,10 @@ void UserRegistrationScreen::update(float dt)
     const float fX = std::round((m_size.x - cW) * 0.5f) + 28.f;
     const float fW = cW - 56.f;
 
-    const bool regHot  = sf::FloatRect{{fX, cY + Y_BUTTONS}, {fW * 0.58f, FIELD_H}}.contains(m_mouse);
+    const bool regHot = sf::FloatRect{{fX, cY + Y_BUTTONS}, {fW * 0.58f, FIELD_H}}.contains(m_mouse);
     const bool backHot = sf::FloatRect{{fX + fW * 0.62f, cY + Y_BUTTONS}, {fW * 0.36f, FIELD_H}}.contains(m_mouse);
 
-    m_regHoverT  = Theme::approachHover(m_regHoverT, regHot, dt);
+    m_regHoverT = Theme::approachHover(m_regHoverT, regHot, dt);
     m_backHoverT = Theme::approachHover(m_backHoverT, backHot, dt);
 }
 
@@ -192,7 +208,7 @@ void UserRegistrationScreen::skipAnimations()
     m_passBox.settle();
 }
 
-void UserRegistrationScreen::draw(sf::RenderTarget& target)
+void UserRegistrationScreen::draw(sf::RenderTarget &target)
 {
     const float cW = std::min(480.f, m_size.x - 60.f);
     const float cH = CARD_H;
@@ -221,13 +237,14 @@ void UserRegistrationScreen::draw(sf::RenderTarget& target)
 
     Theme::drawSeparatorSoft(target, cX + 28.f, cY + Y_RULE, cW - 56.f);
 
-    auto drawLabel = [&](const std::string& s, float y, bool active) {
+    auto drawLabel = [&](const std::string &s, float y, bool active)
+    {
         Theme::drawText(target, m_font, s, Theme::Type::LABEL,
                         active ? Theme::SUCCESS : Theme::TEXT_MUTED,
                         {fX + 2.f, cY + y}, sf::Text::Bold);
     };
     drawLabel("GMAIL ADDRESS", Y_LABEL1, m_focus == F_EMAIL);
-    drawLabel("PASSWORD",      Y_LABEL2, m_focus == F_PASS);
+    drawLabel("PASSWORD", Y_LABEL2, m_focus == F_PASS);
 
     m_emailBox.draw(target);
     m_passBox.draw(target);
@@ -235,9 +252,9 @@ void UserRegistrationScreen::draw(sf::RenderTarget& target)
     Theme::drawText(target, m_font, "Must end in @gmail.com", Theme::Type::CAPTION,
                     Theme::TEXT_ROUTE, {fX + 2.f, cY + Y_HINT});
 
-    Button regBtn (m_font, "Create Account", {fW * 0.58f, FIELD_H}, {fX, cY + Y_BUTTONS},
-                   ButtonStyle::SUCCESS);
-    Button backBtn(m_font, "< Back",         {fW * 0.36f, FIELD_H},
+    Button regBtn(m_font, "Create Account", {fW * 0.58f, FIELD_H}, {fX, cY + Y_BUTTONS},
+                  ButtonStyle::SUCCESS);
+    Button backBtn(m_font, "< Back", {fW * 0.36f, FIELD_H},
                    {fX + fW * 0.62f, cY + Y_BUTTONS}, ButtonStyle::SECONDARY);
     regBtn.setFocused(m_focus == F_REGISTER);
     backBtn.setFocused(m_focus == F_BACK);

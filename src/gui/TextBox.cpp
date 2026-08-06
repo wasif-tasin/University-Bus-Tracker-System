@@ -10,107 +10,144 @@
 
 static constexpr float EYE_AREA_W = 38.f;
 static constexpr unsigned CHAR_SIZE = Theme::Type::INPUT;
-static constexpr float    PAD_L     = 14.f;
+static constexpr float PAD_L = 14.f;
 static constexpr std::size_t MAX_LEN = 256;
 
-static bool isWordChar(char c) {
+static bool isWordChar(char c)
+{
     unsigned char u = static_cast<unsigned char>(c);
     return std::isalnum(u) != 0 || c == '_';
 }
 
-TextBox::TextBox(sf::Font& f, sf::Vector2f size, sf::Vector2f pos)
+TextBox::TextBox(sf::Font &f, sf::Vector2f size, sf::Vector2f pos)
     : m_pos(pos), m_size(size), m_font(f),
       m_value(""), m_placeholder(""),
       m_focused(false), m_passwordMode(false), m_showText(false), m_glowT(0.f),
       m_scroll(0.f), m_caret(0)
-{}
+{
+}
 
-std::string TextBox::displayString() const {
+std::string TextBox::displayString() const
+{
     bool mask = m_passwordMode && !m_showText;
     return mask ? std::string(m_value.size(), '*') : m_value;
 }
 
-sf::Text TextBox::makeText(const std::string& s) const {
+sf::Text TextBox::makeText(const std::string &s) const
+{
     return Theme::makeText(m_font, s, CHAR_SIZE, Theme::TEXT_PRIMARY);
 }
 
-float TextBox::innerWidth() const {
+float TextBox::innerWidth() const
+{
     return m_size.x - PAD_L - (m_passwordMode ? EYE_AREA_W + 8.f : PAD_L);
 }
 
-float TextBox::caretOffset(const sf::Text& t, std::size_t i) const {
-    const auto& glyphs = t.getShapedGlyphs();
-    if (glyphs.empty()) return 0.f;
-    const sf::Text::ShapedGlyph* best = nullptr;
-    for (const auto& g : glyphs) {
-        if (g.cluster < static_cast<std::uint32_t>(i)) continue;
-        if (!best || g.cluster < best->cluster) best = &g;
+float TextBox::caretOffset(const sf::Text &t, std::size_t i) const
+{
+    const auto &glyphs = t.getShapedGlyphs();
+    if (glyphs.empty())
+        return 0.f;
+    const sf::Text::ShapedGlyph *best = nullptr;
+    for (const auto &g : glyphs)
+    {
+        if (g.cluster < static_cast<std::uint32_t>(i))
+            continue;
+        if (!best || g.cluster < best->cluster)
+            best = &g;
     }
-    if (best) return best->position.x;
-    const auto& last = glyphs.back();
+    if (best)
+        return best->position.x;
+    const auto &last = glyphs.back();
     return last.position.x + last.glyph.advance;
 }
-void TextBox::syncScroll() {
+void TextBox::syncScroll()
+{
     const std::string disp = displayString();
     const float iw = innerWidth();
 
-    if (!m_focused || disp.empty()) { m_scroll = 0.f; return; }
+    if (!m_focused || disp.empty())
+    {
+        m_scroll = 0.f;
+        return;
+    }
 
     sf::Text t = makeText(disp);
     const float caretX = caretOffset(t, m_caret);
-    const float full   = t.getLocalBounds().size.x;
+    const float full = t.getLocalBounds().size.x;
 
-    if (caretX - m_scroll > iw - 2.f) m_scroll = caretX - iw + 2.f;
-    if (caretX - m_scroll < 0.f)      m_scroll = caretX;
+    if (caretX - m_scroll > iw - 2.f)
+        m_scroll = caretX - iw + 2.f;
+    if (caretX - m_scroll < 0.f)
+        m_scroll = caretX;
 
     m_scroll = std::clamp(m_scroll, 0.f, std::max(0.f, full - iw + 2.f));
 }
 
-std::size_t TextBox::caretIndexAt(float mouseX) const {
+std::size_t TextBox::caretIndexAt(float mouseX) const
+{
     sf::Text t = makeText(displayString());
     const float originX = std::round(m_pos.x + PAD_L - m_scroll);
 
     std::size_t best = 0;
     float bestDist = std::numeric_limits<float>::max();
-    for (std::size_t i = 0; i <= m_value.size(); ++i) {
+    for (std::size_t i = 0; i <= m_value.size(); ++i)
+    {
         float d = std::abs(originX + caretOffset(t, i) - mouseX);
-        if (d < bestDist) { bestDist = d; best = i; }
+        if (d < bestDist)
+        {
+            bestDist = d;
+            best = i;
+        }
     }
     return best;
 }
 
-std::size_t TextBox::prevWord(std::size_t i) const {
-    while (i > 0 && !isWordChar(m_value[i - 1])) --i;
-    while (i > 0 &&  isWordChar(m_value[i - 1])) --i;
+std::size_t TextBox::prevWord(std::size_t i) const
+{
+    while (i > 0 && !isWordChar(m_value[i - 1]))
+        --i;
+    while (i > 0 && isWordChar(m_value[i - 1]))
+        --i;
     return i;
 }
 
-std::size_t TextBox::nextWord(std::size_t i) const {
+std::size_t TextBox::nextWord(std::size_t i) const
+{
     const std::size_t n = m_value.size();
-    while (i < n && !isWordChar(m_value[i])) ++i;
-    while (i < n &&  isWordChar(m_value[i])) ++i;
+    while (i < n && !isWordChar(m_value[i]))
+        ++i;
+    while (i < n && isWordChar(m_value[i]))
+        ++i;
     return i;
 }
 
-void TextBox::insertText(const std::string& s) {
-    for (char c : s) {
-        if (c < 32 || c > 126) continue;
-        if (m_value.size() >= MAX_LEN) break;
+void TextBox::insertText(const std::string &s)
+{
+    for (char c : s)
+    {
+        if (c < 32 || c > 126)
+            continue;
+        if (m_value.size() >= MAX_LEN)
+            break;
         m_value.insert(m_caret, 1, c);
         ++m_caret;
     }
     syncScroll();
 }
 
-void TextBox::update(float dt) {
+void TextBox::update(float dt)
+{
     m_glowT = Theme::approachHover(m_glowT, m_focused, dt);
     syncScroll();
 }
 
-void TextBox::draw(sf::RenderTarget& target) {
+void TextBox::draw(sf::RenderTarget &target)
+{
     const float RADIUS = 9.f;
 
-    if (m_glowT > 0.01f) {
+    if (m_glowT > 0.01f)
+    {
         Theme::drawGlow(target, m_pos, m_size, RADIUS, Theme::ACCENT,
                         9.f, static_cast<std::uint8_t>(20 * m_glowT), 5);
     }
@@ -121,11 +158,11 @@ void TextBox::draw(sf::RenderTarget& target) {
     Theme::drawRoundedRectV(target, m_pos, m_size, RADIUS, bgTop, bgBot,
                             1.5f, borderColor);
 
-    if (m_passwordMode) {
+    if (m_passwordMode)
+    {
         sf::Vector2f eyeCenter = Theme::px(
             m_pos.x + m_size.x - EYE_AREA_W * 0.5f,
-            m_pos.y + m_size.y * 0.5f
-        );
+            m_pos.y + m_size.y * 0.5f);
         sf::RectangleShape div({1.f, m_size.y * 0.55f});
         div.setPosition(Theme::px(m_pos.x + m_size.x - EYE_AREA_W,
                                   m_pos.y + m_size.y * 0.225f));
@@ -145,106 +182,138 @@ void TextBox::draw(sf::RenderTarget& target) {
     float ty = Theme::centeredTextY(m_font, CHAR_SIZE, m_pos.y, m_size.y);
     txt.setPosition({std::round(m_pos.x + PAD_L - (showPH ? 0.f : m_scroll)), ty});
 
-    auto drawContent = [&]() {
+    auto drawContent = [&]()
+    {
         target.draw(txt);
-        if (!m_focused) return;
+        if (!m_focused)
+            return;
         bool cursorOn = (m_cursorClock.getElapsedTime().asMilliseconds() / 530) % 2 == 0;
-        if (cursorOn) {
+        if (cursorOn)
+        {
             float caretH = ref.size.y + 6.f;
-            float cx     = std::round(txt.getPosition().x + caretOffset(txt, m_caret));
-            float cy     = m_pos.y + (m_size.y - caretH) * 0.5f;
+            float cx = std::round(txt.getPosition().x + caretOffset(txt, m_caret));
+            float cy = m_pos.y + (m_size.y - caretH) * 0.5f;
             Theme::fillRoundedRect(target, Theme::px(cx, cy), {2.f, caretH},
                                    1.f, Theme::ACCENT_HOVER);
         }
     };
 
     const sf::FloatRect strip({m_pos.x + PAD_L, m_pos.y}, {innerWidth(), m_size.y});
-    const sf::Vector2u  tsz = target.getSize();
+    const sf::Vector2u tsz = target.getSize();
 
-    if (strip.size.x <= 1.f || tsz.x == 0u || tsz.y == 0u) { drawContent(); return; }
+    if (strip.size.x <= 1.f || tsz.x == 0u || tsz.y == 0u)
+    {
+        drawContent();
+        return;
+    }
 
     const float tw = static_cast<float>(tsz.x), th = static_cast<float>(tsz.y);
     const sf::View saved = target.getView();
 
     sf::View clip(strip);
     clip.setViewport({{strip.position.x / tw, strip.position.y / th},
-                      {strip.size.x / tw,     strip.size.y / th}});
+                      {strip.size.x / tw, strip.size.y / th}});
     target.setView(clip);
     drawContent();
     target.setView(saved);
 }
-void TextBox::handleEvent(const sf::Event& event) {
-    if (const auto* mb = event.getIf<sf::Event::MouseButtonPressed>()) {
-        if (mb->button == sf::Mouse::Button::Left) {
+void TextBox::handleEvent(const sf::Event &event)
+{
+    if (const auto *mb = event.getIf<sf::Event::MouseButtonPressed>())
+    {
+        if (mb->button == sf::Mouse::Button::Left)
+        {
             sf::Vector2f m{static_cast<float>(mb->position.x),
                            static_cast<float>(mb->position.y)};
-            if (m_passwordMode) {
+            if (m_passwordMode)
+            {
                 float eyeLeft = m_pos.x + m_size.x - EYE_AREA_W;
                 sf::FloatRect eyeArea({eyeLeft, m_pos.y}, {EYE_AREA_W, m_size.y});
-                if (eyeArea.contains(m)) {
+                if (eyeArea.contains(m))
+                {
                     m_showText = !m_showText;
                     return;
                 }
             }
 
-            if (getBounds().contains(m)) {
+            if (getBounds().contains(m))
+            {
                 m_caret = caretIndexAt(m.x);
                 m_cursorClock.restart();
             }
             return;
         }
     }
-    if (!m_focused) return;
+    if (!m_focused)
+        return;
 
-    if (const auto* kp = event.getIf<sf::Event::KeyPressed>()) {
+    if (const auto *kp = event.getIf<sf::Event::KeyPressed>())
+    {
         using Key = sf::Keyboard::Key;
-        switch (kp->code) {
-            case Key::Left:
-                m_caret = kp->control ? prevWord(m_caret)
-                                      : (m_caret > 0 ? m_caret - 1 : 0);
-                break;
-            case Key::Right:
-                m_caret = kp->control ? nextWord(m_caret)
-                                      : std::min(m_caret + 1, m_value.size());
-                break;
-            case Key::Home:
-            case Key::Up:
-                m_caret = 0;
-                break;
-            case Key::End:
-            case Key::Down:
-                m_caret = m_value.size();
-                break;
-            case Key::Delete:
-                if (kp->control) {
-                    std::size_t to = nextWord(m_caret);
-                    m_value.erase(m_caret, to - m_caret);
-                } else if (m_caret < m_value.size()) {
-                    m_value.erase(m_caret, 1);
-                }
-                break;
-            case Key::V:
-                if (kp->control) insertText(sf::Clipboard::getString().toAnsiString());
-                break;
-            default:
-                return;
+        switch (kp->code)
+        {
+        case Key::Left:
+            m_caret = kp->control ? prevWord(m_caret)
+                                  : (m_caret > 0 ? m_caret - 1 : 0);
+            break;
+        case Key::Right:
+            m_caret = kp->control ? nextWord(m_caret)
+                                  : std::min(m_caret + 1, m_value.size());
+            break;
+        case Key::Home:
+        case Key::Up:
+            m_caret = 0;
+            break;
+        case Key::End:
+        case Key::Down:
+            m_caret = m_value.size();
+            break;
+        case Key::Delete:
+            if (kp->control)
+            {
+                std::size_t to = nextWord(m_caret);
+                m_value.erase(m_caret, to - m_caret);
+            }
+            else if (m_caret < m_value.size())
+            {
+                m_value.erase(m_caret, 1);
+            }
+            break;
+        case Key::V:
+            if (kp->control)
+                insertText(sf::Clipboard::getString().toAnsiString());
+            break;
+        default:
+            return;
         }
         syncScroll();
         m_cursorClock.restart();
         return;
     }
 
-    if (const auto* te = event.getIf<sf::Event::TextEntered>()) {
+    if (const auto *te = event.getIf<sf::Event::TextEntered>())
+    {
         uint32_t u = te->unicode;
-        if (u == 8) {
-            if (m_caret > 0) { m_value.erase(m_caret - 1, 1); --m_caret; }
-        } else if (u == 127) {
+        if (u == 8)
+        {
+            if (m_caret > 0)
+            {
+                m_value.erase(m_caret - 1, 1);
+                --m_caret;
+            }
+        }
+        else if (u == 127)
+        {
             std::size_t from = prevWord(m_caret);
             m_value.erase(from, m_caret - from);
             m_caret = from;
-        } else if (u >= 32 && u <= 126) {
+        }
+        else if (u >= 32 && u <= 126)
+        {
             insertText(std::string(1, static_cast<char>(u)));
-        } else {
+        }
+        else
+        {
             return;
         }
         syncScroll();
@@ -252,10 +321,13 @@ void TextBox::handleEvent(const sf::Event& event) {
     }
 }
 
-void TextBox::setFocused(bool f) {
-    if (f != m_focused) {
+void TextBox::setFocused(bool f)
+{
+    if (f != m_focused)
+    {
         m_cursorClock.restart();
-        if (f) m_caret = std::min(m_caret, m_value.size());
+        if (f)
+            m_caret = std::min(m_caret, m_value.size());
     }
     m_focused = f;
     syncScroll();
@@ -265,10 +337,31 @@ void TextBox::settle() { m_glowT = m_focused ? 1.f : 0.f; }
 
 std::string TextBox::getText() const { return m_value; }
 
-void TextBox::setPlaceholder(const std::string& ph) { m_placeholder = ph; }
-void TextBox::setPasswordMode(bool pm)               { m_passwordMode = pm; if (!pm) m_showText = false; syncScroll(); }
-void TextBox::clear()                                { m_value = ""; m_showText = false; m_caret = 0; m_scroll = 0.f; }
-void TextBox::setText(const std::string& t)          { m_value = t; m_caret = m_value.size(); syncScroll(); }
-void TextBox::setPosition(sf::Vector2f p)            { m_pos   = p; }
-void TextBox::setSize(sf::Vector2f s)                { m_size  = s; syncScroll(); }
-sf::FloatRect TextBox::getBounds() const             { return {m_pos, m_size}; }
+void TextBox::setPlaceholder(const std::string &ph) { m_placeholder = ph; }
+void TextBox::setPasswordMode(bool pm)
+{
+    m_passwordMode = pm;
+    if (!pm)
+        m_showText = false;
+    syncScroll();
+}
+void TextBox::clear()
+{
+    m_value = "";
+    m_showText = false;
+    m_caret = 0;
+    m_scroll = 0.f;
+}
+void TextBox::setText(const std::string &t)
+{
+    m_value = t;
+    m_caret = m_value.size();
+    syncScroll();
+}
+void TextBox::setPosition(sf::Vector2f p) { m_pos = p; }
+void TextBox::setSize(sf::Vector2f s)
+{
+    m_size = s;
+    syncScroll();
+}
+sf::FloatRect TextBox::getBounds() const { return {m_pos, m_size}; }

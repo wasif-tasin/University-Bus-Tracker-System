@@ -237,17 +237,17 @@ void User::searchBus()
 
     ifstream file("data/buses.txt");
 
-    string id,name,university,seats,route;
+    string id, name, university, seats, route;
 
     bool found = false;
 
-    while(getline(file,id,'|') &&
-          getline(file,name,'|') &&
-          getline(file,university,'|') &&
-          getline(file,seats,'|') &&
-          getline(file,route))
+    while (getline(file, id, '|') &&
+           getline(file, name, '|') &&
+           getline(file, university, '|') &&
+           getline(file, seats, '|') &&
+           getline(file, route))
     {
-        if(id == searchID)
+        if (id == searchID)
         {
             found = true;
 
@@ -261,7 +261,7 @@ void User::searchBus()
         }
     }
 
-    if(!found)
+    if (!found)
     {
         cout << "\nBus Not Found.\n";
     }
@@ -281,17 +281,17 @@ void User::searchByStop()
 
     ifstream file("data/buses.txt");
 
-    string id,name,university,seats,route;
+    string id, name, university, seats, route;
 
     bool found = false;
 
-    while(getline(file,id,'|') &&
-          getline(file,name,'|') &&
-          getline(file,university,'|') &&
-          getline(file,seats,'|') &&
-          getline(file,route))
+    while (getline(file, id, '|') &&
+           getline(file, name, '|') &&
+           getline(file, university, '|') &&
+           getline(file, seats, '|') &&
+           getline(file, route))
     {
-        if(route.find(stop) != string::npos)
+        if (route.find(stop) != string::npos)
         {
             found = true;
 
@@ -301,7 +301,7 @@ void User::searchByStop()
         }
     }
 
-    if(!found)
+    if (!found)
     {
         cout << "\nNo Bus Found For This Stop.\n";
     }
@@ -309,7 +309,7 @@ void User::searchByStop()
     file.close();
 }
 
-bool User::registerUser(const string& email, const string& password, string& errorMsg)
+bool User::registerUser(const string &email, const string &password, string &errorMsg)
 {
     if (email.size() <= 10 || email.substr(email.size() - 10) != "@gmail.com")
     {
@@ -349,7 +349,7 @@ bool User::registerUser(const string& email, const string& password, string& err
     return true;
 }
 
-bool User::loginUser(const string& email, const string& password, string& errorMsg)
+bool User::loginUser(const string &email, const string &password, string &errorMsg)
 {
     ifstream file("data/users.txt");
     if (!file)
@@ -413,9 +413,12 @@ std::vector<Bus> User::getBuses()
         b.setBusID(id);
         b.setBusName(name);
         b.setUniversityCode(university);
-        try {
+        try
+        {
             b.setTotalSeats(std::stoi(seatsStr));
-        } catch(...) {
+        }
+        catch (...)
+        {
             b.setTotalSeats(0);
         }
         b.setRoute(route);
@@ -425,7 +428,7 @@ std::vector<Bus> User::getBuses()
     return list;
 }
 
-std::vector<Bus> User::getBusesForUniversity(const string& universityCode)
+std::vector<Bus> User::getBusesForUniversity(const string &universityCode)
 {
     std::vector<Bus> list;
     ifstream file("data/buses.txt");
@@ -448,9 +451,12 @@ std::vector<Bus> User::getBusesForUniversity(const string& universityCode)
             b.setBusID(id);
             b.setBusName(name);
             b.setUniversityCode(university);
-            try {
+            try
+            {
                 b.setTotalSeats(std::stoi(seatsStr));
-            } catch(...) {
+            }
+            catch (...)
+            {
                 b.setTotalSeats(0);
             }
             b.setRoute(route);
@@ -461,7 +467,7 @@ std::vector<Bus> User::getBusesForUniversity(const string& universityCode)
     return list;
 }
 
-std::vector<Bus> User::searchBus(const string& busID)
+std::vector<Bus> User::searchBus(const string &busID)
 {
     std::vector<Bus> list;
     ifstream file("data/buses.txt");
@@ -484,9 +490,12 @@ std::vector<Bus> User::searchBus(const string& busID)
             b.setBusID(id);
             b.setBusName(name);
             b.setUniversityCode(university);
-            try {
+            try
+            {
                 b.setTotalSeats(std::stoi(seatsStr));
-            } catch(...) {
+            }
+            catch (...)
+            {
                 b.setTotalSeats(0);
             }
             b.setRoute(route);
@@ -498,7 +507,7 @@ std::vector<Bus> User::searchBus(const string& busID)
     return list;
 }
 
-std::vector<Bus> User::searchByStop(const string& stopName)
+std::vector<Bus> User::searchByStop(const string &stopName)
 {
     std::vector<Bus> list;
     ifstream file("data/buses.txt");
@@ -521,9 +530,12 @@ std::vector<Bus> User::searchByStop(const string& stopName)
             b.setBusID(id);
             b.setBusName(name);
             b.setUniversityCode(university);
-            try {
+            try
+            {
                 b.setTotalSeats(std::stoi(seatsStr));
-            } catch(...) {
+            }
+            catch (...)
+            {
                 b.setTotalSeats(0);
             }
             b.setRoute(route);

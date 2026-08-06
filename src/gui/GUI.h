@@ -30,17 +30,17 @@ private:
                     float k, bool measure);
 
     sf::Font &m_font;
-    Button    m_exitBtn;
+    Button m_exitBtn;
 
-    int   m_focus;
+    int m_focus;
     float m_card1T;
     float m_card2T;
     float m_introT;
 
-    float m_leftW  = 0.f, m_rightX = 0.f, m_rightW = 0.f;
-    float m_cardX  = 0.f, m_cardW  = 0.f, m_cardH  = 0.f;
+    float m_leftW = 0.f, m_rightX = 0.f, m_rightW = 0.f;
+    float m_cardX = 0.f, m_cardW = 0.f, m_cardH = 0.f;
     float m_card1Y = 0.f, m_card2Y = 0.f;
-    bool  m_card1Hover = false, m_card2Hover = false;
+    bool m_card1Hover = false, m_card2Hover = false;
 };
 
 class GUI

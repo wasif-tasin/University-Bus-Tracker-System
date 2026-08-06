@@ -10,23 +10,31 @@
 class UserLoginScreen : public Screen
 {
 public:
-    UserLoginScreen(sf::Font& font);
+    UserLoginScreen(sf::Font &font);
 
     std::string title() const override { return "University Bus Tracker - User Login"; }
     void onEnter() override;
     void prepare(sf::Vector2f size, sf::Vector2f mouse) override;
-    void handleEvent(const sf::Event& event) override;
+    void handleEvent(const sf::Event &event) override;
     void update(float dt) override;
-    void draw(sf::RenderTarget& target) override;
+    void draw(sf::RenderTarget &target) override;
     void skipAnimations() override;
 
 private:
-    enum Focus { F_NONE = -1, F_EMAIL = 0, F_PASS, F_LOGIN, F_BACK, F_COUNT };
+    enum Focus
+    {
+        F_NONE = -1,
+        F_EMAIL = 0,
+        F_PASS,
+        F_LOGIN,
+        F_BACK,
+        F_COUNT
+    };
 
     void submit();
     void step(int delta);
 
-    sf::Font& m_font;
+    sf::Font &m_font;
     User m_user;
 
     TextBox m_emailBox;

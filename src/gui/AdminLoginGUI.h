@@ -10,25 +10,33 @@
 class AdminLoginScreen : public Screen
 {
 public:
-    AdminLoginScreen(sf::Font& font);
+    AdminLoginScreen(sf::Font &font);
 
     std::string title() const override { return "University Bus Tracker - Admin Login"; }
     void onEnter() override;
     void prepare(sf::Vector2f size, sf::Vector2f mouse) override;
-    void handleEvent(const sf::Event& event) override;
+    void handleEvent(const sf::Event &event) override;
     void update(float dt) override;
-    void draw(sf::RenderTarget& target) override;
+    void draw(sf::RenderTarget &target) override;
     void skipAnimations() override;
 
 private:
     // F_NONE = nothing focused yet, so the screen opens with no highlight.
     // The first Tab/arrow lands on the first control.
-    enum Focus { F_NONE = -1, F_USER = 0, F_PASS, F_LOGIN, F_BACK, F_COUNT };
+    enum Focus
+    {
+        F_NONE = -1,
+        F_USER = 0,
+        F_PASS,
+        F_LOGIN,
+        F_BACK,
+        F_COUNT
+    };
 
     void submit();
     void step(int delta);
 
-    sf::Font& m_font;
+    sf::Font &m_font;
     Admin m_admin;
 
     TextBox m_userBox;

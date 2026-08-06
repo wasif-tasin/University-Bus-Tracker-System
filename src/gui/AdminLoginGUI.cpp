@@ -65,8 +65,10 @@ void AdminLoginScreen::onEnter()
 
 void AdminLoginScreen::step(int delta)
 {
-    if (m_focus == F_NONE) m_focus = (delta > 0) ? 0 : F_COUNT - 1;
-    else                   m_focus = (m_focus + delta + F_COUNT) % F_COUNT;
+    if (m_focus == F_NONE)
+        m_focus = (delta > 0) ? 0 : F_COUNT - 1;
+    else
+        m_focus = (m_focus + delta + F_COUNT) % F_COUNT;
 }
 
 void AdminLoginScreen::submit()
