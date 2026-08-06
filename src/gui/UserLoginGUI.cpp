@@ -57,11 +57,17 @@ UserLoginScreen::UserLoginScreen(sf::Font& font)
 void UserLoginScreen::onEnter()
 {
 
-    m_focus = F_EMAIL;
+    m_focus = F_NONE;
     m_errorText.clear();
     m_passBox.clear();
-    m_emailBox.setFocused(true);
+    m_emailBox.setFocused(false);
     m_passBox.setFocused(false);
+}
+
+void UserLoginScreen::step(int delta)
+{
+    if (m_focus == F_NONE) m_focus = (delta > 0) ? 0 : F_COUNT - 1;
+    else                   m_focus = (m_focus + delta + F_COUNT) % F_COUNT;
 }
 
 void UserLoginScreen::submit()
@@ -130,22 +136,22 @@ void UserLoginScreen::handleEvent(const sf::Event& event)
         {
             case Key::Enter:
 
-                if      (m_focus == F_EMAIL) m_focus = F_PASS;
+                if      (m_focus == F_NONE)  m_focus = F_EMAIL;
+                else if (m_focus == F_EMAIL) m_focus = F_PASS;
                 else if (m_focus == F_BACK)  m_app->pop();
                 else                         submit();
                 break;
 
             case Key::Tab:
-                m_focus = kp->shift ? (m_focus + F_COUNT - 1) % F_COUNT
-                                    : (m_focus + 1) % F_COUNT;
+                step(kp->shift ? -1 : 1);
                 break;
 
             case Key::Down:
-                m_focus = (m_focus + 1) % F_COUNT;
+                step(1);
                 break;
 
             case Key::Up:
-                m_focus = (m_focus + F_COUNT - 1) % F_COUNT;
+                step(-1);
                 break;
 
             case Key::Left:

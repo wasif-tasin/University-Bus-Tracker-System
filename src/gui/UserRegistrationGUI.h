@@ -21,9 +21,10 @@ public:
     void skipAnimations() override;
 
 private:
-    enum Focus { F_EMAIL = 0, F_PASS, F_REGISTER, F_BACK, F_COUNT };
+    enum Focus { F_NONE = -1, F_EMAIL = 0, F_PASS, F_REGISTER, F_BACK, F_COUNT };
 
     void submit();
+    void step(int delta);
 
     sf::Font& m_font;
     User m_user;
@@ -33,7 +34,7 @@ private:
 
     std::string m_infoText;
     bool m_infoIsError = false;
-    int m_focus = F_EMAIL;
+    int m_focus = F_NONE;
     float m_regHoverT = 0.f;
     float m_backHoverT = 0.f;
 };

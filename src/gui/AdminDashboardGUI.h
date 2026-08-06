@@ -45,7 +45,7 @@ private:
     int   m_selIdx    = -1;
     float m_scrollOff = 0.f;
     float m_maxScroll = 0.f;
-    int   m_focusField = 0;
+    int   m_focusField = -1;
 
     std::vector<std::pair<std::string, std::string>> m_unis;
     std::vector<Bus>                                 m_buses;
@@ -60,6 +60,12 @@ private:
 
     float m_addHoverT = 0.f, m_delHoverT = 0.f;
     float m_saveHoverT = 0.f, m_cancelHoverT = 0.f;
+
+    State m_shownState = DASHBOARD;
+    float m_stateT     = 1.f;
+
+    float m_navT[3]   = {0.f, 0.f, 0.f};
+    float m_logoutT   = 0.f;
 
     float m_contentW = 0.f, m_contentH = 0.f;
     float m_fX = 0.f, m_fW = 0.f, m_fW2 = 0.f, m_c1X = 0.f, m_c2X = 0.f;

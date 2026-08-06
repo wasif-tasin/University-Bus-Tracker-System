@@ -62,6 +62,12 @@ private:
     TextBox m_uniCodeBox, m_busIdBox, m_stopBox;
 
     float m_searchHoverT = 0.f;
+    State m_shownState = USER_DASHBOARD;
+    float m_stateT     = 1.f;
+    float m_resultsT   = 1.f;
+
+    float m_navT[5] = {0.f, 0.f, 0.f, 0.f, 0.f};
+    float m_logoutT = 0.f;
 
     float m_contentW = 0.f, m_contentH = 0.f;
     float m_fX = 0.f, m_srchW = 0.f, m_srchBtnX = 0.f;

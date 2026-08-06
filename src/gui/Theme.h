@@ -14,55 +14,55 @@ namespace Theme {
 
 inline constexpr float PI = 3.14159265358979f;
 
-inline const sf::Color BG_DARK          = sf::Color(15,  22,  40 );
-inline const sf::Color BG_CARD          = sf::Color(26,  37,  64 );
-inline const sf::Color BG_CARD_DARK     = sf::Color(20,  28,  50 );
-inline const sf::Color BG_HEADER        = sf::Color(10,  15,  28 );
+inline const sf::Color BG_DARK          = sf::Color(13,  18,  32 );
+inline const sf::Color BG_CARD          = sf::Color(23,  31,  51 );
+inline const sf::Color BG_CARD_DARK     = sf::Color(18,  25,  42 );
+inline const sf::Color BG_HEADER        = sf::Color(10,  14,  25 );
 
-inline const sf::Color ACCENT           = sf::Color(59,  130, 246);
-inline const sf::Color ACCENT_HOVER     = sf::Color(96,  165, 250);
-inline const sf::Color ACCENT_PRESSED   = sf::Color(37,  99,  235);
+inline const sf::Color ACCENT           = sf::Color(56,  114, 199);
+inline const sf::Color ACCENT_HOVER     = sf::Color(86,  145, 226);
+inline const sf::Color ACCENT_PRESSED   = sf::Color(40,  88,  160);
 
-inline const sf::Color SUCCESS        = sf::Color(34,  197, 94 );
-inline const sf::Color SUCCESS_DARK     = sf::Color(22,  163, 74 );
-inline const sf::Color DANGER           = sf::Color(239, 68,  68 );
-inline const sf::Color DANGER_HOVER     = sf::Color(248, 113, 113);
-inline const sf::Color DANGER_DARK      = sf::Color(185, 28,  28 );
-inline const sf::Color WARNING          = sf::Color(234, 179, 8  );
+inline const sf::Color SUCCESS          = sf::Color(52,  150, 96 );
+inline const sf::Color SUCCESS_DARK     = sf::Color(36,  118, 74 );
+inline const sf::Color DANGER           = sf::Color(196, 74,  74 );
+inline const sf::Color DANGER_HOVER     = sf::Color(216, 106, 106);
+inline const sf::Color DANGER_DARK      = sf::Color(156, 46,  46 );
+inline const sf::Color WARNING          = sf::Color(198, 156, 74 );
 
-inline const sf::Color PURPLE           = sf::Color(124, 58,  237);
-inline const sf::Color PURPLE_HOVER     = sf::Color(139, 92,  246);
+inline const sf::Color PURPLE           = sf::Color(109, 74,  176);
+inline const sf::Color PURPLE_HOVER     = sf::Color(134, 102, 200);
 
-inline const sf::Color TEXT_PRIMARY     = sf::Color(255, 255, 255);
-inline const sf::Color TEXT_SECONDARY   = sf::Color(215, 220, 231);
-inline const sf::Color TEXT_MUTED       = sf::Color(154, 164, 181);
-inline const sf::Color TEXT_ROUTE       = sf::Color(138, 149, 168);
+inline const sf::Color TEXT_PRIMARY     = sf::Color(238, 242, 248);
+inline const sf::Color TEXT_SECONDARY   = sf::Color(196, 205, 220);
+inline const sf::Color TEXT_MUTED       = sf::Color(140, 152, 172);
+inline const sf::Color TEXT_ROUTE       = sf::Color(126, 138, 158);
 
-inline const sf::Color BORDER_IDLE      = sf::Color(51,  65,  85 );
-inline const sf::Color BORDER_FOCUS     = sf::Color(59,  130, 246);
+inline const sf::Color BORDER_IDLE      = sf::Color(46,  58,  80 );
+inline const sf::Color BORDER_FOCUS     = sf::Color(86,  133, 196);
 
-inline const sf::Color BADGE_UNI_BG     = sf::Color(37,  71,  132);
-inline const sf::Color BADGE_UNI_TEXT   = sf::Color(235, 244, 255);
-inline const sf::Color BADGE_UNI_EDGE   = sf::Color(74,  126, 208);
+inline const sf::Color BADGE_UNI_BG     = sf::Color(34,  62,  110);
+inline const sf::Color BADGE_UNI_TEXT   = sf::Color(226, 236, 250);
+inline const sf::Color BADGE_UNI_EDGE   = sf::Color(70,  112, 176);
 
-inline const sf::Color BADGE_BUS_BG     = sf::Color(74,  48,  130);
-inline const sf::Color BADGE_BUS_TEXT   = sf::Color(233, 224, 255);
-inline const sf::Color BADGE_BUS_EDGE   = sf::Color(133, 96,  222);
+inline const sf::Color BADGE_BUS_BG     = sf::Color(64,  46,  106);
+inline const sf::Color BADGE_BUS_TEXT   = sf::Color(228, 220, 244);
+inline const sf::Color BADGE_BUS_EDGE   = sf::Color(120, 92,  186);
 
-inline const sf::Color ITEM_BG          = sf::Color(20,  30,  55 );
-inline const sf::Color ITEM_HOVER       = sf::Color(36,  48,  80 );
-inline const sf::Color ITEM_SELECTED    = sf::Color(29,  78,  216);
+inline const sf::Color ITEM_BG          = sf::Color(19,  26,  45 );
+inline const sf::Color ITEM_HOVER       = sf::Color(32,  43,  70 );
+inline const sf::Color ITEM_SELECTED    = sf::Color(38,  74,  140);
 
-inline const sf::Color SIDEBAR_HOVER    = sf::Color(28,  40,  68 );
-inline const sf::Color SIDEBAR_SELECTED = sf::Color(29,  78,  216);
+inline const sf::Color SIDEBAR_HOVER    = sf::Color(25,  35,  58 );
+inline const sf::Color SIDEBAR_SELECTED = sf::Color(38,  74,  140);
 
-inline const sf::Color BG_DEEP          = sf::Color(8,   12,  24 );
+inline const sf::Color BG_DEEP          = sf::Color(7,   10,  18 );
 
-inline const sf::Color ACCENT_CYAN      = sf::Color(34,  211, 238);
-inline const sf::Color ACCENT_INDIGO    = sf::Color(99,  102, 241);
-inline const sf::Color PURPLE_PINK      = sf::Color(217, 70,  239);
+inline const sf::Color ACCENT_CYAN      = sf::Color(90,  170, 190);
+inline const sf::Color ACCENT_INDIGO    = sf::Color(92,  104, 178);
+inline const sf::Color PURPLE_PINK      = sf::Color(166, 88,  166);
 
-inline const sf::Color SHEEN            = sf::Color(255, 255, 255, 16);
+inline const sf::Color SHEEN            = sf::Color(255, 255, 255, 10);
 
 inline sf::Vector2f px(float x, float y) {
     return { std::round(x), std::round(y) };
@@ -554,7 +554,7 @@ inline void drawGradientRect(sf::RenderTarget& target,
 
 inline void drawAppBase(sf::RenderTarget& target, sf::Vector2f size,
                         sf::Color top = BG_DARK, sf::Color bottom = BG_DEEP,
-                        std::uint8_t scrim = 145)
+                        std::uint8_t scrim = 178)
 {
     if (drawBackgroundImage(target, size, scrim)) return;
     drawGradientRect(target, {0.f, 0.f}, size, top, bottom);
@@ -566,7 +566,7 @@ inline void drawIconCircle(sf::RenderTarget& target, const sf::Font& font,
                             sf::Color letterColor, unsigned letterSize = 20)
 {
 
-    drawRadialGlow(target, center, radius * 2.3f, letterColor, 30);
+    drawRadialGlow(target, center, radius * 2.1f, letterColor, 20);
 
     sf::CircleShape ring(radius, 48);
     ring.setFillColor(sf::Color::Transparent);
@@ -632,19 +632,27 @@ inline void drawSidebarBackdrop(sf::RenderTarget& target, float w, float h,
 }
 
 inline void drawNavItem(sf::RenderTarget& target, float sidebarW,
-                         float y, float h, bool active, bool hovered,
+                         float y, float h, bool active, float hoverT,
                          sf::Color accent = ACCENT)
 {
+    hoverT = std::clamp(hoverT, 0.f, 1.f);
+
     if (active)
         fillRoundedRectV(target, {8.f, y}, {sidebarW - 18.f, h}, 10.f,
                          lerp(SIDEBAR_SELECTED, sf::Color::White, 0.12f),
                          SIDEBAR_SELECTED);
-    else if (hovered)
-        fillRoundedRect(target, {8.f, y}, {sidebarW - 18.f, h}, 10.f, SIDEBAR_HOVER);
+    else if (hoverT > 0.004f)
+        fillRoundedRect(target, {8.f, y}, {sidebarW - 18.f, h}, 10.f,
+                        withAlpha(SIDEBAR_HOVER,
+                                  static_cast<uint8_t>(255 * hoverT)));
 
     if (active)
         fillRoundedRect(target, {0.f, y + h * 0.22f}, {3.f, h * 0.56f}, 1.5f,
                         lerp(accent, sf::Color::White, 0.30f));
+    else if (hoverT > 0.004f)
+        fillRoundedRect(target, {0.f, y + h * (0.5f - 0.28f * hoverT)},
+                        {3.f, h * 0.56f * hoverT}, 1.5f,
+                        withAlpha(accent, static_cast<uint8_t>(150 * hoverT)));
 }
 
 inline void drawHeaderBar(sf::RenderTarget& target, float x, float w, float h,

@@ -122,7 +122,7 @@ void drawTeamIcon(sf::RenderTarget &target, sf::Vector2f pos, float size,
 HomeScreen::HomeScreen(sf::Font &font)
     : m_font(font),
       m_exitBtn(font, "Exit", {150.f, 46.f}, {0.f, 0.f}, ButtonStyle::GHOST, 10.f),
-      m_focus(0), m_card1T(0.f), m_card2T(0.f), m_introT(0.f)
+      m_focus(-1), m_card1T(0.f), m_card2T(0.f), m_introT(0.f)
 {}
 
 void HomeScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
@@ -154,8 +154,9 @@ void HomeScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
 
 void HomeScreen::step(int delta)
 {
+    if (m_focus < 0) m_focus = (delta > 0) ? 0 : 2;
+    else             m_focus = (m_focus + delta + 3) % 3;
 
-    m_focus = (m_focus + delta + 3) % 3;
     m_exitBtn.setFocused(m_focus == 2);
 }
 
@@ -171,6 +172,12 @@ void HomeScreen::openAdminPanel()
 
 void HomeScreen::handleEvent(const sf::Event &event)
 {
+    if (event.is<sf::Event::MouseMoved>())
+    {
+        m_focus = -1;
+        m_exitBtn.setFocused(false);
+    }
+
     if (const auto *key = event.getIf<sf::Event::KeyPressed>())
     {
         switch (key->code)
@@ -183,7 +190,8 @@ void HomeScreen::handleEvent(const sf::Event &event)
             case sf::Keyboard::Key::Left:  step(-1); return;
 
             case sf::Keyboard::Key::Enter:
-                if (m_focus == 0)      openUserPanel();
+                if (m_focus < 0)       step(+1);
+                else if (m_focus == 0) openUserPanel();
                 else if (m_focus == 1) openAdminPanel();
                 else                   m_app->quit();
                 return;

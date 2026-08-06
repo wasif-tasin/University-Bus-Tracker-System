@@ -20,6 +20,8 @@ constexpr float HH = 60.f;
 constexpr int UNI_FIELDS = 2, UNI_SAVE = 2, UNI_CANCEL = 3, UNI_COUNT = 4;
 constexpr int BUS_FIELDS = 5, BUS_SAVE = 5, BUS_CANCEL = 6, BUS_COUNT = 7;
 
+constexpr int FIELD_NONE = -1;
+
 constexpr float CARD_H   = 104.f;
 constexpr float UCARD_H  = 76.f;
 constexpr float CARD_GAP = 12.f;
@@ -28,13 +30,19 @@ constexpr float FIELD_H  = 58.f;
 
 constexpr float TOAST_HOLD = 3.f;
 
+constexpr float SECTION_SECONDS = 0.42f;
+constexpr float ROW_STAGGER     = 0.045f;
+constexpr float RISE_PX         = 18.f;
+
 struct NavItem { const char* label; int state; float y; };
 
 const NavItem NAV[] = {
-    {"Dashboard",    0 ,         82.f},
-    {"Universities", 1 , 132.f},
-    {"Buses",        3 ,        182.f},
+    {"Dashboard",    0,  82.f},
+    {"Universities", 1, 132.f},
+    {"Buses",        3, 182.f},
 };
+
+constexpr int NAV_COUNT = static_cast<int>(sizeof(NAV) / sizeof(NAV[0]));
 
 }
 
@@ -94,7 +102,7 @@ void AdminDashboardScreen::saveUniversity()
         m_selIdx = -1;
         m_uniCodeBox.clear();
         m_uniNameBox.clear();
-        m_focusField = 0;
+        m_focusField = FIELD_NONE;
     }
     else
     {
@@ -108,7 +116,7 @@ void AdminDashboardScreen::cancelUniversity()
     m_unis  = m_admin.getUniversities();
     m_uniCodeBox.clear();
     m_uniNameBox.clear();
-    m_focusField = 0;
+    m_focusField = FIELD_NONE;
 }
 
 void AdminDashboardScreen::saveBus()
@@ -130,7 +138,7 @@ void AdminDashboardScreen::saveBus()
         m_busUniBox.clear();
         m_busSeatsBox.clear();
         m_busRouteBox.clear();
-        m_focusField = 0;
+        m_focusField = FIELD_NONE;
     }
     else
     {
@@ -147,7 +155,7 @@ void AdminDashboardScreen::cancelBus()
     m_busUniBox.clear();
     m_busSeatsBox.clear();
     m_busRouteBox.clear();
-    m_focusField = 0;
+    m_focusField = FIELD_NONE;
 }
 
 void AdminDashboardScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
@@ -163,21 +171,23 @@ void AdminDashboardScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
     m_c1X = m_fX;
     m_c2X = m_fX + m_fW2 + 24.f;
 
-    m_uniCodeBox.setPosition({m_fX, HH + 110.f});
+    const float fdy = (1.f - Theme::smoothstep01(m_stateT)) * RISE_PX;
+
+    m_uniCodeBox.setPosition({m_fX, HH + 110.f + fdy});
     m_uniCodeBox.setSize    ({m_fW, FIELD_H});
-    m_uniNameBox.setPosition({m_fX, HH + 214.f});
+    m_uniNameBox.setPosition({m_fX, HH + 214.f + fdy});
     m_uniNameBox.setSize    ({m_fW, FIELD_H});
 
-    m_busIdBox.setPosition   ({m_c1X, HH + 110.f});
+    m_busIdBox.setPosition   ({m_c1X, HH + 110.f + fdy});
     m_busIdBox.setSize       ({m_fW2, FIELD_H});
-    m_busNameBox.setPosition ({m_c1X, HH + 214.f});
+    m_busNameBox.setPosition ({m_c1X, HH + 214.f + fdy});
     m_busNameBox.setSize     ({m_fW2, FIELD_H});
-    m_busUniBox.setPosition  ({m_c1X, HH + 318.f});
+    m_busUniBox.setPosition  ({m_c1X, HH + 318.f + fdy});
     m_busUniBox.setSize      ({m_fW2, FIELD_H});
-    m_busSeatsBox.setPosition({m_c2X, HH + 214.f});
+    m_busSeatsBox.setPosition({m_c2X, HH + 214.f + fdy});
     m_busSeatsBox.setSize    ({m_fW2, FIELD_H});
     // Route: full-width row below the two-column fields
-    m_busRouteBox.setPosition({m_fX,  HH + 422.f});
+    m_busRouteBox.setPosition({m_fX,  HH + 422.f + fdy});
     m_busRouteBox.setSize    ({m_fW,  FIELD_H});
 
     m_uniCodeBox.setFocused(m_state == ADD_UNIVERSITY && m_focusField == 0);
@@ -232,14 +242,14 @@ void AdminDashboardScreen::handleEvent(const sf::Event& event)
                 addRect.contains(m_mouse))
             {
                 m_state = ADD_UNIVERSITY;
-                m_focusField = 0;
+                m_focusField = FIELD_NONE;
                 m_selIdx = -1;
             }
             if ((m_state == VIEW_BUSES || m_state == ADD_BUS) &&
                 addRect.contains(m_mouse))
             {
                 m_state = ADD_BUS;
-                m_focusField = 0;
+                m_focusField = FIELD_NONE;
                 m_selIdx = -1;
             }
             if (m_state == VIEW_UNIVERSITIES && delRect.contains(m_mouse) &&
@@ -329,26 +339,35 @@ void AdminDashboardScreen::handleEvent(const sf::Event& event)
             const int  cancAt = uni ? UNI_CANCEL : BUS_CANCEL;
             bool consumed = true;
 
+            // m_focusField == FIELD_NONE means nothing is highlighted yet; the
+            // first Tab/arrow enters the form at either end.
+            auto stepField = [&](int delta) {
+                if (m_focusField == FIELD_NONE)
+                    m_focusField = (delta > 0) ? 0 : count - 1;
+                else
+                    m_focusField = (m_focusField + delta + count) % count;
+            };
+
             switch (kp->code)
             {
                 case Key::Enter:
 
-                    if      (m_focusField <  fields - 1) ++m_focusField;
+                    if      (m_focusField == FIELD_NONE) m_focusField = 0;
+                    else if (m_focusField <  fields - 1) ++m_focusField;
                     else if (m_focusField == cancAt)     { if (uni) cancelUniversity(); else cancelBus(); }
                     else                                 { if (uni) saveUniversity();   else saveBus();   }
                     break;
 
                 case Key::Tab:
-                    m_focusField = kp->shift ? (m_focusField + count - 1) % count
-                                             : (m_focusField + 1) % count;
+                    stepField(kp->shift ? -1 : 1);
                     break;
 
                 case Key::Down:
-                    m_focusField = (m_focusField + 1) % count;
+                    stepField(1);
                     break;
 
                 case Key::Up:
-                    m_focusField = (m_focusField + count - 1) % count;
+                    stepField(-1);
                     break;
 
                 case Key::Left:
@@ -378,8 +397,8 @@ void AdminDashboardScreen::handleEvent(const sf::Event& event)
             if (kp->code == Key::Enter)
             {
 
-                if (m_state == VIEW_UNIVERSITIES) { m_state = ADD_UNIVERSITY; m_focusField = 0; m_selIdx = -1; }
-                if (m_state == VIEW_BUSES)        { m_state = ADD_BUS;        m_focusField = 0; m_selIdx = -1; }
+                if (m_state == VIEW_UNIVERSITIES) { m_state = ADD_UNIVERSITY; m_focusField = FIELD_NONE; m_selIdx = -1; }
+                if (m_state == VIEW_BUSES)        { m_state = ADD_BUS;        m_focusField = FIELD_NONE; m_selIdx = -1; }
                 return;
             }
             if (kp->code == Key::Escape)
@@ -418,6 +437,16 @@ void AdminDashboardScreen::handleEvent(const sf::Event& event)
 
 void AdminDashboardScreen::update(float dt)
 {
+    if (m_state != m_shownState)
+    {
+        m_shownState = m_state;
+        m_stateT     = 0.f;
+    }
+    else if (m_stateT < 1.f)
+    {
+        m_stateT = std::min(1.f, m_stateT + dt / SECTION_SECONDS);
+    }
+
     if (m_showInfo)
     {
         m_infoAge += dt;
@@ -444,10 +473,21 @@ void AdminDashboardScreen::update(float dt)
     const bool cancelHot = sf::FloatRect{{m_fX + 170.f, btnY}, {110.f, 44.f}}.contains(m_mouse);
     m_saveHoverT   = Theme::approachHover(m_saveHoverT,   saveHot,   dt);
     m_cancelHoverT = Theme::approachHover(m_cancelHoverT, cancelHot, dt);
+
+    for (int i = 0; i < NAV_COUNT; ++i)
+    {
+        const bool hot = m_mouse.x < SW && m_mouse.y >= NAV[i].y &&
+                         m_mouse.y < NAV[i].y + 42.f;
+        m_navT[i] = Theme::approachHover(m_navT[i], hot, dt);
+    }
+    const bool logHot = m_mouse.x < SW && m_mouse.y >= m_size.y - 52.f &&
+                        m_mouse.y < m_size.y - 12.f;
+    m_logoutT = Theme::approachHover(m_logoutT, logHot, dt);
 }
 
 void AdminDashboardScreen::skipAnimations()
 {
+    m_stateT = 1.f;
     m_uniCodeBox.settle();
     m_uniNameBox.settle();
     m_busIdBox.settle();
@@ -460,7 +500,6 @@ void AdminDashboardScreen::skipAnimations()
 void AdminDashboardScreen::drawSidebar(sf::RenderTarget& target)
 {
     const float wh = m_size.y;
-    const float mx = m_mouse.x, my = m_mouse.y;
 
     Theme::drawSidebarBackdrop(target, SW, wh, Theme::ACCENT);
 
@@ -471,27 +510,33 @@ void AdminDashboardScreen::drawSidebar(sf::RenderTarget& target)
 
     Theme::drawSeparatorSoft(target, 10.f, 70.f, SW - 20.f);
 
-    for (const auto& nav : NAV)
+    for (int i = 0; i < NAV_COUNT; ++i)
     {
+        const NavItem& nav = NAV[i];
         const State st = static_cast<State>(nav.state);
         bool active = (m_state == st) ||
                       (st == VIEW_UNIVERSITIES && m_state == ADD_UNIVERSITY) ||
                       (st == VIEW_BUSES        && m_state == ADD_BUS);
-        bool hov    = mx < SW && my >= nav.y && my < nav.y + 42.f;
 
-        Theme::drawNavItem(target, SW, nav.y, 42.f, active, hov, Theme::ACCENT);
+        Theme::drawNavItem(target, SW, nav.y, 42.f, active, m_navT[i], Theme::ACCENT);
+
+        const float tx = 22.f + (active ? 0.f : 3.f * m_navT[i]);
         Theme::drawTextVCentered(target, m_font, nav.label, Theme::Type::META,
-                                 active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
-                                 22.f, nav.y, 42.f,
+                                 active ? Theme::TEXT_PRIMARY
+                                        : Theme::lerp(Theme::TEXT_SECONDARY,
+                                                      Theme::TEXT_PRIMARY, m_navT[i]),
+                                 tx, nav.y, 42.f,
                                  active ? sf::Text::Bold : sf::Text::Regular);
     }
 
-    bool logHov = mx < SW && my >= wh - 52.f && my < wh - 12.f;
-    if (logHov)
+    if (m_logoutT > 0.004f)
         Theme::fillRoundedRect(target, {8.f, wh - 52.f}, {SW - 18.f, 40.f}, 10.f,
-                               Theme::withAlpha(Theme::DANGER, 45));
+                               Theme::withAlpha(Theme::DANGER,
+                                                static_cast<std::uint8_t>(45 * m_logoutT)));
     Theme::drawTextVCentered(target, m_font, "Logout", Theme::Type::META,
-                             Theme::DANGER_HOVER, 22.f, wh - 52.f, 40.f, sf::Text::Bold);
+                             Theme::lerp(Theme::DANGER_HOVER, sf::Color::White,
+                                         0.35f * m_logoutT),
+                             22.f + 3.f * m_logoutT, wh - 52.f, 40.f, sf::Text::Bold);
     Theme::drawSeparatorSoft(target, 10.f, wh - 56.f, SW - 20.f);
 }
 
@@ -536,6 +581,13 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
     const float CARD_W   = CW - 40.f;
     const float LIST_TOP = HH + 20.f;
 
+    const float sectionRise = (1.f - Theme::smoothstep01(m_stateT)) * RISE_PX;
+    auto rowRise = [&](int i) {
+        const float t = Theme::smoothstep01(
+            std::clamp((m_stateT - ROW_STAGGER * i) / 0.55f, 0.f, 1.f));
+        return (1.f - t) * RISE_PX;
+    };
+
     Theme::drawAppBase(target, {ww, wh});
     if (!Theme::backgroundReady())
     {
@@ -552,21 +604,23 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
         float scW  = (CW - 60.f) * 0.5f;
         float sc1X = SW + 20.f, sc2X = SW + 30.f + scW;
 
-        auto statCard = [&](float x, sf::Color accent, const string& value, const string& label) {
-            Theme::drawCard(target, {x, scy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
-            Theme::drawAccentBar(target, x, scy, 116.f, accent, 5.f);
+        auto statCard = [&](float x, sf::Color accent, const string& value,
+                            const string& label, int idx) {
+            const float sy = scy + rowRise(idx);
+            Theme::drawCard(target, {x, sy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
+            Theme::drawAccentBar(target, x, sy, 116.f, accent, 5.f);
             Theme::drawText(target, m_font, value, 46, accent,
-                            {x + 24.f, scy + 12.f}, sf::Text::Bold);
+                            {x + 24.f, sy + 12.f}, sf::Text::Bold);
             Theme::drawText(target, m_font, label, Theme::Type::LABEL,
-                            Theme::TEXT_MUTED, {x + 24.f, scy + 84.f}, sf::Text::Bold);
+                            Theme::TEXT_MUTED, {x + 24.f, sy + 84.f}, sf::Text::Bold);
         };
-        statCard(sc1X, Theme::ACCENT, to_string(allUnis.size()),  "UNIVERSITIES");
-        statCard(sc2X, Theme::PURPLE, to_string(allBuses.size()), "BUSES");
+        statCard(sc1X, Theme::ACCENT, to_string(allUnis.size()),  "UNIVERSITIES", 0);
+        statCard(sc2X, Theme::PURPLE, to_string(allBuses.size()), "BUSES",        1);
 
         Theme::drawText(target, m_font,
                         "Use the sidebar to manage Universities and Buses.",
                         Theme::Type::META, Theme::TEXT_SECONDARY,
-                        {SW + 22.f, scy + 148.f});
+                        {SW + 22.f, scy + 148.f + rowRise(2)});
     }
     else if (m_state == VIEW_UNIVERSITIES)
     {
@@ -578,7 +632,7 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
 
         for (int i = 0; i < static_cast<int>(m_unis.size()); ++i)
         {
-            float cy = LIST_TOP + i * (UCARD_H + CARD_GAP) - m_scrollOff;
+            float cy = LIST_TOP + i * (UCARD_H + CARD_GAP) - m_scrollOff + rowRise(i);
             if (cy + UCARD_H < HH || cy > wh) continue;
 
             bool sel = (i == m_selIdx);
@@ -608,14 +662,15 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
     }
     else if (m_state == ADD_UNIVERSITY)
     {
-        Theme::drawCardElevated(target, {SW + 20.f, HH + 20.f}, {CW - 40.f, 380.f},
-                                Theme::BG_CARD, 14.f, 20.f, 14);
-        Theme::fillRoundedRectV(target, {SW + 38.f, HH + 21.f}, {CW - 76.f, 3.f}, 1.5f,
+        Theme::drawCardElevated(target, {SW + 20.f, HH + 20.f + sectionRise},
+                                {CW - 40.f, 380.f}, Theme::BG_CARD, 14.f, 20.f, 14);
+        Theme::fillRoundedRectV(target, {SW + 38.f, HH + 21.f + sectionRise},
+                                {CW - 76.f, 3.f}, 1.5f,
                                 Theme::ACCENT_CYAN, Theme::ACCENT);
 
         auto drawLbl = [&](const string& s, float x, float y) {
             Theme::drawText(target, m_font, s, Theme::Type::LABEL,
-                            Theme::TEXT_MUTED, {x, y}, sf::Text::Bold);
+                            Theme::TEXT_MUTED, {x, y + sectionRise}, sf::Text::Bold);
         };
         drawLbl("UNIVERSITY CODE", m_fX, HH + 94.f);
         drawLbl("UNIVERSITY NAME", m_fX, HH + 198.f);
@@ -623,8 +678,10 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
         m_uniCodeBox.draw(target);
         m_uniNameBox.draw(target);
 
-        Button saveBtn  (m_font, "Save",   {160.f, 44.f}, {m_fX,         HH + 320.f});
-        Button cancelBtn(m_font, "Cancel", {110.f, 44.f}, {m_fX + 170.f, HH + 320.f},
+        Button saveBtn  (m_font, "Save",   {160.f, 44.f},
+                         {m_fX,         HH + 320.f + sectionRise});
+        Button cancelBtn(m_font, "Cancel", {110.f, 44.f},
+                         {m_fX + 170.f, HH + 320.f + sectionRise},
                          ButtonStyle::SECONDARY);
         saveBtn.setFocused  (m_focusField == UNI_SAVE);
         cancelBtn.setFocused(m_focusField == UNI_CANCEL);
@@ -643,7 +700,7 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
 
         for (int i = 0; i < static_cast<int>(m_buses.size()); ++i)
         {
-            float cy = LIST_TOP + i * (CARD_H + CARD_GAP) - m_scrollOff;
+            float cy = LIST_TOP + i * (CARD_H + CARD_GAP) - m_scrollOff + rowRise(i);
             if (cy + CARD_H < HH || cy > wh) continue;
 
             bool sel = (i == m_selIdx);
@@ -685,14 +742,15 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
     }
     else if (m_state == ADD_BUS)
     {
-        Theme::drawCardElevated(target, {SW + 20.f, HH + 20.f}, {CW - 40.f, 580.f},
-                                Theme::BG_CARD, 14.f, 20.f, 14);
-        Theme::fillRoundedRectV(target, {SW + 38.f, HH + 21.f}, {CW - 76.f, 3.f}, 1.5f,
+        Theme::drawCardElevated(target, {SW + 20.f, HH + 20.f + sectionRise},
+                                {CW - 40.f, 580.f}, Theme::BG_CARD, 14.f, 20.f, 14);
+        Theme::fillRoundedRectV(target, {SW + 38.f, HH + 21.f + sectionRise},
+                                {CW - 76.f, 3.f}, 1.5f,
                                 Theme::PURPLE_HOVER, Theme::PURPLE);
 
         auto drawLbl = [&](const string& s, float x, float y) {
             Theme::drawText(target, m_font, s, Theme::Type::LABEL,
-                            Theme::TEXT_MUTED, {x, y}, sf::Text::Bold);
+                            Theme::TEXT_MUTED, {x, y + sectionRise}, sf::Text::Bold);
         };
         drawLbl("BUS ID",                     m_c1X, HH + 94.f);
         drawLbl("BUS NAME",                   m_c1X, HH + 198.f);
@@ -706,8 +764,10 @@ void AdminDashboardScreen::draw(sf::RenderTarget& target)
         m_busSeatsBox.draw(target);
         m_busRouteBox.draw(target);
 
-        Button saveBusBtn  (m_font, "Save Bus", {160.f, 44.f}, {m_fX,         HH + 510.f});
-        Button cancelBusBtn(m_font, "Cancel",   {110.f, 44.f}, {m_fX + 170.f, HH + 510.f},
+        Button saveBusBtn  (m_font, "Save Bus", {160.f, 44.f},
+                            {m_fX,         HH + 510.f + sectionRise});
+        Button cancelBusBtn(m_font, "Cancel",   {110.f, 44.f},
+                            {m_fX + 170.f, HH + 510.f + sectionRise},
                             ButtonStyle::SECONDARY);
         saveBusBtn.setFocused  (m_focusField == BUS_SAVE);
         cancelBusBtn.setFocused(m_focusField == BUS_CANCEL);

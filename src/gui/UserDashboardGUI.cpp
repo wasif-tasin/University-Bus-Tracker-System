@@ -23,15 +23,21 @@ constexpr float CARD_GAP = 12.f;
 
 constexpr float TOAST_HOLD = 3.f;
 
+constexpr float SECTION_SECONDS = 0.42f;
+constexpr float ROW_STAGGER     = 0.045f;
+constexpr float RISE_PX         = 18.f;
+
 struct NavItem { const char* label; int state; float y; };
 
 const NavItem NAV[] = {
-    {"Universities",   1 , 82.f},
-    {"All Buses",      3 ,        132.f},
-    {"By University",  2 , 182.f},
-    {"Search Bus ID",  4 ,        232.f},
-    {"Search by Stop", 5 ,    282.f},
+    {"Universities",   1,  82.f},
+    {"All Buses",      3, 132.f},
+    {"By University",  2, 182.f},
+    {"Search Bus ID",  4, 232.f},
+    {"Search by Stop", 5, 282.f},
 };
+
+constexpr int NAV_COUNT = static_cast<int>(sizeof(NAV) / sizeof(NAV[0]));
 
 string wrapRoute(const string& route, float maxW, const sf::Font& font,
                  unsigned sz, const string& prefix = "Route: ")
@@ -114,6 +120,7 @@ void UserDashboardScreen::goTo(State next)
 void UserDashboardScreen::runSearch()
 {
     m_scrollOff = 0.f;
+    m_resultsT  = 0.f;  
 
     if (m_state == USER_SELECT_UNIVERSITY)
     {
@@ -148,7 +155,8 @@ void UserDashboardScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
     m_srchBtnX = m_fX + m_srchW + 12.f;
 
     const sf::Vector2f fieldSize{m_srchW, 44.f};
-    const sf::Vector2f fieldPos {m_fX, HH + 28.f};
+    const float fdy = (1.f - Theme::smoothstep01(m_stateT)) * RISE_PX;
+    const sf::Vector2f fieldPos {m_fX, HH + 28.f + fdy};
 
     m_uniCodeBox.setSize(fieldSize);
     m_busIdBox.setSize(fieldSize);
@@ -240,6 +248,20 @@ void UserDashboardScreen::handleEvent(const sf::Event& event)
 
 void UserDashboardScreen::update(float dt)
 {
+    if (m_state != m_shownState)
+    {
+        m_shownState = m_state;
+        m_stateT     = 0.f;
+        m_resultsT   = 0.f;
+    }
+    else if (m_stateT < 1.f)
+    {
+        m_stateT = std::min(1.f, m_stateT + dt / SECTION_SECONDS);
+    }
+
+    if (m_resultsT < 1.f)
+        m_resultsT = std::min(1.f, m_resultsT + dt / SECTION_SECONDS);
+
     if (m_showInfo)
     {
         m_infoAge += dt;
@@ -253,10 +275,23 @@ void UserDashboardScreen::update(float dt)
     const bool searchHot =
         sf::FloatRect{{m_srchBtnX, HH + 28.f}, {110.f, 44.f}}.contains(m_mouse);
     m_searchHoverT = Theme::approachHover(m_searchHoverT, searchHot, dt);
+
+    // Sidebar hover easing.
+    for (int i = 0; i < NAV_COUNT; ++i)
+    {
+        const bool hot = m_mouse.x < SW && m_mouse.y >= NAV[i].y &&
+                         m_mouse.y < NAV[i].y + 42.f;
+        m_navT[i] = Theme::approachHover(m_navT[i], hot, dt);
+    }
+    const bool logHot = m_mouse.x < SW && m_mouse.y >= m_size.y - 52.f &&
+                        m_mouse.y < m_size.y - 12.f;
+    m_logoutT = Theme::approachHover(m_logoutT, logHot, dt);
 }
 
 void UserDashboardScreen::skipAnimations()
 {
+    m_stateT   = 1.f;
+    m_resultsT = 1.f;
     m_uniCodeBox.settle();
     m_busIdBox.settle();
     m_stopBox.settle();
@@ -298,7 +333,6 @@ void UserDashboardScreen::drawBusCard(sf::RenderTarget& target, const Bus& b,
 void UserDashboardScreen::drawSidebar(sf::RenderTarget& target)
 {
     const float wh = m_size.y;
-    const float mx = m_mouse.x, my = m_mouse.y;
 
     Theme::drawSidebarBackdrop(target, SW, wh, Theme::ACCENT);
 
@@ -309,25 +343,31 @@ void UserDashboardScreen::drawSidebar(sf::RenderTarget& target)
 
     Theme::drawSeparatorSoft(target, 10.f, 70.f, SW - 20.f);
 
-    for (const auto& nav : NAV)
+    for (int i = 0; i < NAV_COUNT; ++i)
     {
+        const NavItem& nav = NAV[i];
         bool active = (m_state == static_cast<State>(nav.state));
-        bool hov    = mx < SW && my >= nav.y && my < nav.y + 42.f;
 
-        Theme::drawNavItem(target, SW, nav.y, 42.f, active, hov, Theme::ACCENT);
+        Theme::drawNavItem(target, SW, nav.y, 42.f, active, m_navT[i], Theme::ACCENT);
+
+        const float tx = 22.f + (active ? 0.f : 3.f * m_navT[i]);
         Theme::drawTextVCentered(target, m_font, nav.label, Theme::Type::META,
-                                 active ? Theme::TEXT_PRIMARY : Theme::TEXT_SECONDARY,
-                                 22.f, nav.y, 42.f,
+                                 active ? Theme::TEXT_PRIMARY
+                                        : Theme::lerp(Theme::TEXT_SECONDARY,
+                                                      Theme::TEXT_PRIMARY, m_navT[i]),
+                                 tx, nav.y, 42.f,
                                  active ? sf::Text::Bold : sf::Text::Regular);
     }
 
-    bool lh = mx < SW && my >= wh - 52.f && my < wh - 12.f;
-    if (lh)
+    if (m_logoutT > 0.004f)
         Theme::fillRoundedRect(target, {8.f, wh - 52.f}, {SW - 18.f, 40.f}, 10.f,
-                               Theme::withAlpha(Theme::DANGER, 45));
+                               Theme::withAlpha(Theme::DANGER,
+                                                static_cast<std::uint8_t>(45 * m_logoutT)));
     Theme::drawSeparatorSoft(target, 10.f, wh - 56.f, SW - 20.f);
     Theme::drawTextVCentered(target, m_font, "Logout", Theme::Type::META,
-                             Theme::DANGER_HOVER, 22.f, wh - 52.f, 40.f, sf::Text::Bold);
+                             Theme::lerp(Theme::DANGER_HOVER, sf::Color::White,
+                                         0.35f * m_logoutT),
+                             22.f + 3.f * m_logoutT, wh - 52.f, 40.f, sf::Text::Bold);
 }
 
 void UserDashboardScreen::drawHeader(sf::RenderTarget& target)
@@ -358,6 +398,13 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
     const float CARD_W   = CW - 40.f;
     const float LIST_TOP = HH + 20.f;
 
+    const float sectionRise = (1.f - Theme::smoothstep01(m_stateT)) * RISE_PX;
+    auto rowRise = [&](int i) {
+        const float t = Theme::smoothstep01(
+            std::clamp((m_resultsT - ROW_STAGGER * i) / 0.55f, 0.f, 1.f));
+        return (1.f - t) * RISE_PX;
+    };
+
     Theme::drawAppBase(target, {ww, wh});
     if (!Theme::backgroundReady())
     {
@@ -367,7 +414,8 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
 
     auto drawSearchBar = [&](TextBox& box) {
         box.draw(target);
-        Button btn(m_font, "Search", {110.f, 44.f}, {m_srchBtnX, HH + 28.f});
+        Button btn(m_font, "Search", {110.f, 44.f},
+                   {m_srchBtnX, HH + 28.f + sectionRise});
         btn.setHoverT(m_searchHoverT);
         btn.draw(target);
     };
@@ -381,21 +429,23 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
         float scW  = (CW - 60.f) * 0.5f;
         float sc1X = SW + 20.f, sc2X = SW + 30.f + scW;
 
-        auto statCard = [&](float x, sf::Color accent, const string& value, const string& label) {
-            Theme::drawCard(target, {x, scy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
-            Theme::drawAccentBar(target, x, scy, 116.f, accent, 5.f);
+        auto statCard = [&](float x, sf::Color accent, const string& value,
+                            const string& label, int idx) {
+            const float sy = scy + rowRise(idx);
+            Theme::drawCard(target, {x, sy}, {scW, 116.f}, Theme::BG_CARD, 12.f);
+            Theme::drawAccentBar(target, x, sy, 116.f, accent, 5.f);
             Theme::drawText(target, m_font, value, 46, accent,
-                            {x + 24.f, scy + 12.f}, sf::Text::Bold);
+                            {x + 24.f, sy + 12.f}, sf::Text::Bold);
             Theme::drawText(target, m_font, label, Theme::Type::LABEL,
-                            Theme::TEXT_MUTED, {x + 24.f, scy + 84.f}, sf::Text::Bold);
+                            Theme::TEXT_MUTED, {x + 24.f, sy + 84.f}, sf::Text::Bold);
         };
-        statCard(sc1X, Theme::ACCENT, to_string(allUnis.size()),  "UNIVERSITIES");
-        statCard(sc2X, Theme::PURPLE, to_string(allBuses.size()), "BUSES");
+        statCard(sc1X, Theme::ACCENT, to_string(allUnis.size()),  "UNIVERSITIES", 0);
+        statCard(sc2X, Theme::PURPLE, to_string(allBuses.size()), "BUSES",        1);
 
         Theme::drawText(target, m_font,
                         "Use the sidebar to browse universities and bus routes.",
                         Theme::Type::META, Theme::TEXT_SECONDARY,
-                        {SW + 22.f, scy + 148.f});
+                        {SW + 22.f, scy + 148.f + rowRise(2)});
     }
     else if (m_state == USER_VIEW_UNIVERSITIES)
     {
@@ -408,7 +458,7 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
 
         for (int i = 0; i < static_cast<int>(m_unis.size()); ++i)
         {
-            float cy = LIST_TOP + i * (UCARD_H + CARD_GAP) - m_scrollOff;
+            float cy = LIST_TOP + i * (UCARD_H + CARD_GAP) - m_scrollOff + rowRise(i);
             if (cy + UCARD_H < HH || cy > wh) continue;
 
             bool hov = inContent && my >= cy && my < cy + UCARD_H;
@@ -441,7 +491,7 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
 
         for (int i = 0; i < static_cast<int>(m_buses.size()); ++i)
         {
-            float cy = LIST_TOP + i * (CARD_H + CARD_GAP) - m_scrollOff;
+            float cy = LIST_TOP + i * (CARD_H + CARD_GAP) - m_scrollOff + rowRise(i);
             if (cy + CARD_H < HH || cy > wh) continue;
             bool hov = inContent && my >= cy && my < cy + CARD_H;
             drawBusCard(target, m_buses[i], CARD_X, cy, CARD_W, hov, true);
@@ -462,7 +512,7 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
 
         for (int i = 0; i < static_cast<int>(m_buses.size()); ++i)
         {
-            float cy = listTop + i * (CARD_H + CARD_GAP) - m_scrollOff;
+            float cy = listTop + i * (CARD_H + CARD_GAP) - m_scrollOff + rowRise(i);
             if (cy + CARD_H < HH || cy > wh) continue;
             bool hov = inContent && my >= cy && my < cy + CARD_H;
             drawBusCard(target, m_buses[i], CARD_X, cy, CARD_W, hov, false);
@@ -475,7 +525,7 @@ void UserDashboardScreen::draw(sf::RenderTarget& target)
         if (!m_buses.empty())
         {
             const Bus& b = m_buses[0];
-            float cy = HH + 92.f;
+            float cy = HH + 92.f + rowRise(0);
             Theme::drawCard(target, {CARD_X, cy}, {CARD_W, 230.f}, Theme::ITEM_BG, 10.f);
             Theme::drawAccentBar(target, CARD_X, cy, 230.f, Theme::PURPLE, 4.f);
 
