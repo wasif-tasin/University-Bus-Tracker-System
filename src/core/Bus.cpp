@@ -34,27 +34,27 @@ void Bus::setRoute(std::string r)
     route = r;
 }
 
-std::string Bus::getBusID()
+std::string Bus::getBusID() const
 {
     return busID;
 }
 
-std::string Bus::getBusName()
+std::string Bus::getBusName() const
 {
     return busName;
 }
 
-std::string Bus::getUniversityCode()
+std::string Bus::getUniversityCode() const
 {
     return universityCode;
 }
 
-int Bus::getTotalSeats()
+int Bus::getTotalSeats() const
 {
     return totalSeats;
 }
 
-std::string Bus::getRoute()
+std::string Bus::getRoute() const
 {
     return route;
 }

@@ -21,11 +21,11 @@ public:
     void setTotalSeats(int seats);
     void setRoute(std::string route);
 
-    std::string getBusID();
-    std::string getBusName();
-    std::string getUniversityCode();
-    int getTotalSeats();
-    std::string getRoute();
+    std::string getBusID() const;
+    std::string getBusName() const;
+    std::string getUniversityCode() const;
+    int getTotalSeats() const;
+    std::string getRoute() const;
 };
 
 #endif

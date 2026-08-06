@@ -1,17 +1,12 @@
 #include "UserRegistrationGUI.h"
+#include "ScreenManager.h"
 #include "Button.h"
-#include "TextBox.h"
 #include "Theme.h"
-#include "User.h"
 
 #include <SFML/Graphics.hpp>
 #include <algorithm>
 
 namespace {
-// Keyboard focus order: Enter walks down this chain and fires the last stop.
-enum Focus { F_EMAIL = 0, F_PASS, F_REGISTER, F_BACK, F_COUNT };
-
-// Vertical rhythm inside the card, all relative to its top edge.
 constexpr float CARD_H    = 424.f;
 constexpr float Y_ICON    = 46.f;
 constexpr float Y_TITLE   = 78.f;
@@ -27,208 +22,232 @@ constexpr float Y_INFO    = 394.f;
 constexpr float FIELD_H   = 46.f;
 }
 
-void UserRegistrationGUI::run()
+UserRegistrationScreen::UserRegistrationScreen(sf::Font& font)
+    : m_font(font)
+    , m_emailBox(font, {100.f, FIELD_H}, {0.f, 0.f})
+    , m_passBox(font, {100.f, FIELD_H}, {0.f, 0.f})
 {
-    sf::RenderWindow window(sf::VideoMode({720, 520}),
-                            "University Bus Tracker - Register",
-                            sf::Style::Default, sf::State::Windowed,
-                            Theme::uiContext());
-    window.setFramerateLimit(60);
+    m_emailBox.setPlaceholder("yourname@gmail.com");
+    m_passBox.setPlaceholder("Choose a password");
+    m_passBox.setPasswordMode(true);
+}
 
-    sf::Font font;
-    if (!Theme::loadUIFont(font)) return;
+void UserRegistrationScreen::onEnter()
+{
+    m_focus = F_EMAIL;
+    m_infoText.clear();
+    m_infoIsError = false;
+    m_emailBox.setFocused(true);
+}
 
-    User user;
-    std::string infoText;
-    bool infoIsError = false;
-    int  focus       = F_EMAIL;
+void UserRegistrationScreen::submit()
+{
+    std::string errMsg;
+    if (m_user.registerUser(m_emailBox.getText(), m_passBox.getText(), errMsg))
+    {
+        m_infoText = "Account created! You can now login.";
+        m_infoIsError = false;
+        m_emailBox.clear();
+        m_passBox.clear();
+        m_focus = F_EMAIL;
+    }
+    else
+    {
+        m_infoText = errMsg;
+        m_infoIsError = true;
+        m_focus = F_PASS;
+    }
+}
 
-    // Hover easing lives out here: the buttons are rebuilt every frame and so
-    // cannot carry their own animation state.
-    float regHoverT = 0.f, backHoverT = 0.f;
+void UserRegistrationScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
+{
+    Screen::prepare(size, mouse);
 
-    const float ww = 720.f, wh = 520.f;
-    const float cW = std::min(480.f, ww - 60.f);
+    const float cW = std::min(480.f, size.x - 60.f);
     const float cH = CARD_H;
-    const float cX = std::round((ww - cW) * 0.5f);
-    const float cY = std::round((wh - cH) * 0.5f);
+    const float cX = std::round((size.x - cW) * 0.5f);
+    const float cY = std::round((size.y - cH) * 0.5f);
     const float fX = cX + 28.f;
     const float fW = cW - 56.f;
 
-    TextBox emailBox(font, {fW, FIELD_H}, {fX, cY + Y_FIELD1});
-    TextBox passBox (font, {fW, FIELD_H}, {fX, cY + Y_FIELD2});
-    emailBox.setPlaceholder("yourname@gmail.com");
-    passBox.setPlaceholder("Choose a password");
-    passBox.setPasswordMode(true);
-    emailBox.setFocused(true);
+    m_emailBox.setPosition({fX, cY + Y_FIELD1});
+    m_passBox.setPosition({fX, cY + Y_FIELD2});
 
-    auto submit = [&]() {
-        std::string errMsg;
-        if (user.registerUser(emailBox.getText(), passBox.getText(), errMsg)) {
-            infoText    = "Account created! You can now login.";
-            infoIsError = false;
-            emailBox.clear();
-            passBox.clear();
-            focus = F_EMAIL;
-        } else {
-            infoText    = errMsg;
-            infoIsError = true;
-            focus       = F_PASS;
-        }
-    };
+    m_emailBox.setFocused(m_focus == F_EMAIL);
+    m_passBox.setFocused(m_focus == F_PASS);
+}
 
-    while (window.isOpen())
+void UserRegistrationScreen::handleEvent(const sf::Event& event)
+{
+    const float cW = std::min(480.f, m_size.x - 60.f);
+    const float cH = CARD_H;
+    const float cX = std::round((m_size.x - cW) * 0.5f);
+    const float cY = std::round((m_size.y - cH) * 0.5f);
+    const float fX = cX + 28.f;
+    const float fW = cW - 56.f;
+
+    const sf::FloatRect regRect{{fX, cY + Y_BUTTONS}, {fW * 0.58f, FIELD_H}};
+    const sf::FloatRect backRect{{fX + fW * 0.62f, cY + Y_BUTTONS}, {fW * 0.36f, FIELD_H}};
+
+    if (event.is<sf::Event::MouseButtonPressed>())
     {
-        emailBox.setFocused(focus == F_EMAIL);
-        passBox.setFocused(focus == F_PASS);
+        if (m_emailBox.getBounds().contains(m_mouse)) m_focus = F_EMAIL;
+        if (m_passBox.getBounds().contains(m_mouse))  m_focus = F_PASS;
 
-        Button regBtn (font, "Create Account", {fW * 0.58f, FIELD_H}, {fX,              cY + Y_BUTTONS},
-                       ButtonStyle::SUCCESS);
-        Button backBtn(font, "< Back",         {fW * 0.36f, FIELD_H}, {fX + fW * 0.62f, cY + Y_BUTTONS},
-                       ButtonStyle::SECONDARY);
-        regBtn.setFocused(focus == F_REGISTER);
-        backBtn.setFocused(focus == F_BACK);
-        regBtn.setHoverT(regHoverT);
-        backBtn.setHoverT(backHoverT);
+        if (regRect.contains(m_mouse)) {
+            m_focus = F_REGISTER;
+            submit();
+            return;
+        }
+        if (backRect.contains(m_mouse)) {
+            m_app->pop();
+            return;
+        }
 
-        while (const std::optional event = window.pollEvent())
+        m_emailBox.handleEvent(event);
+        m_passBox.handleEvent(event);
+    }
+
+    if (const auto* kp = event.getIf<sf::Event::KeyPressed>())
+    {
+        using Key = sf::Keyboard::Key;
+        bool consumed = true;
+
+        switch (kp->code)
         {
-            if (event->is<sf::Event::Closed>()) window.close();
-            Theme::syncViewToWindow(window, *event);
-            if (event->is<sf::Event::MouseButtonPressed>())
-            {
-                auto mp = sf::Mouse::getPosition(window);
-                float mx = static_cast<float>(mp.x);
-                float my = static_cast<float>(mp.y);
+            case Key::Enter:
+                if      (m_focus == F_EMAIL) m_focus = F_PASS;
+                else if (m_focus == F_BACK)  m_app->pop();
+                else                         submit();
+                break;
 
-                if (emailBox.getBounds().contains({mx, my})) { focus = F_EMAIL; }
-                if (passBox.getBounds().contains({mx, my}))  { focus = F_PASS;  }
+            case Key::Tab:
+                m_focus = kp->shift ? (m_focus + F_COUNT - 1) % F_COUNT
+                                    : (m_focus + 1) % F_COUNT;
+                break;
 
-                if (regBtn.isClicked(window)) {
-                    focus = F_REGISTER;
-                    submit();
-                }
-                if (backBtn.isClicked(window)) window.close();
+            case Key::Down:
+                m_focus = (m_focus + 1) % F_COUNT;
+                break;
 
-                emailBox.handleEvent(*event);
-                passBox.handleEvent(*event);
-            }
+            case Key::Up:
+                m_focus = (m_focus + F_COUNT - 1) % F_COUNT;
+                break;
 
-            if (const auto* kp = event->getIf<sf::Event::KeyPressed>())
-            {
-                using Key = sf::Keyboard::Key;
-                bool consumed = true;
+            case Key::Left:
+                if (m_focus == F_BACK) m_focus = F_REGISTER;
+                else                   consumed = false;
+                break;
 
-                switch (kp->code)
-                {
-                    case Key::Enter:
-                        // Finish a field -> drop to the next one; on the last
-                        // field Enter presses Create Account, so the form never
-                        // needs the mouse.
-                        if      (focus == F_EMAIL) focus = F_PASS;
-                        else if (focus == F_BACK)  window.close();
-                        else                       submit();
-                        break;
+            case Key::Right:
+                if (m_focus == F_REGISTER) m_focus = F_BACK;
+                else                       consumed = false;
+                break;
 
-                    case Key::Tab:
-                        focus = kp->shift ? (focus + F_COUNT - 1) % F_COUNT
-                                          : (focus + 1) % F_COUNT;
-                        break;
+            case Key::Escape:
+                m_app->pop();
+                break;
 
-                    case Key::Down:
-                        focus = (focus + 1) % F_COUNT;
-                        break;
-
-                    case Key::Up:
-                        focus = (focus + F_COUNT - 1) % F_COUNT;
-                        break;
-
-                    case Key::Left:
-                        // Only steer between the buttons; inside a field the
-                        // arrows still belong to the caret.
-                        if (focus == F_BACK) focus = F_REGISTER;
-                        else                 consumed = false;
-                        break;
-
-                    case Key::Right:
-                        if (focus == F_REGISTER) focus = F_BACK;
-                        else                     consumed = false;
-                        break;
-
-                    case Key::Escape:
-                        window.close();
-                        break;
-
-                    default:
-                        consumed = false;
-                        break;
-                }
-
-                if (consumed) continue;
-            }
-
-            if (event->is<sf::Event::TextEntered>() ||
-                event->is<sf::Event::KeyPressed>()) {
-                if      (focus == F_EMAIL) emailBox.handleEvent(*event);
-                else if (focus == F_PASS)  passBox.handleEvent(*event);
-            }
+            default:
+                consumed = false;
+                break;
         }
 
-        regBtn.update(window);
-        backBtn.update(window);
-        regHoverT  = regBtn.hoverT();
-        backHoverT = backBtn.hoverT();
+        if (consumed) return;
+    }
 
-        window.clear(Theme::BG_DARK);
-        Theme::drawBackdrop(window, ww, wh, Theme::SUCCESS, Theme::ACCENT);
+    if (event.is<sf::Event::TextEntered>() || event.is<sf::Event::KeyPressed>())
+    {
+        if      (m_focus == F_EMAIL) m_emailBox.handleEvent(event);
+        else if (m_focus == F_PASS)  m_passBox.handleEvent(event);
+    }
+}
 
-        Theme::drawCardElevated(window, {cX, cY}, {cW, cH}, Theme::BG_CARD, 16.f, 26.f, 15);
+void UserRegistrationScreen::update(float dt)
+{
+    m_emailBox.update(dt);
+    m_passBox.update(dt);
 
-        // Accent stripe that follows the card's rounded top edge.
-        Theme::fillRoundedRectV(window, {cX + 18.f, cY + 1.f}, {cW - 36.f, 3.f}, 1.5f,
-                                Theme::SUCCESS, Theme::SUCCESS_DARK);
+    const float cW = std::min(480.f, m_size.x - 60.f);
+    const float cY = std::round((m_size.y - CARD_H) * 0.5f);
+    const float fX = std::round((m_size.x - cW) * 0.5f) + 28.f;
+    const float fW = cW - 56.f;
 
-        Theme::drawIconCircle(window, font, {cX + cW * 0.5f, cY + Y_ICON},
-                              23.f, Theme::withAlpha(Theme::SUCCESS, 55),
-                              "+", Theme::SUCCESS, 23);
+    const bool regHot  = sf::FloatRect{{fX, cY + Y_BUTTONS}, {fW * 0.58f, FIELD_H}}.contains(m_mouse);
+    const bool backHot = sf::FloatRect{{fX + fW * 0.62f, cY + Y_BUTTONS}, {fW * 0.36f, FIELD_H}}.contains(m_mouse);
 
-        Theme::drawTextHCentered(window, font, "Create Account", Theme::Type::TITLE,
-                                 Theme::TEXT_PRIMARY, cX + cW * 0.5f, cY + Y_TITLE,
-                                 sf::Text::Bold);
-        Theme::drawTextHCentered(window, font, "One account, every route on campus",
-                                 Theme::Type::META, Theme::TEXT_MUTED,
-                                 cX + cW * 0.5f, cY + Y_SUB);
+    m_regHoverT  = Theme::approachHover(m_regHoverT, regHot, dt);
+    m_backHoverT = Theme::approachHover(m_backHoverT, backHot, dt);
+}
 
-        Theme::drawSeparatorSoft(window, cX + 28.f, cY + Y_RULE, cW - 56.f);
+void UserRegistrationScreen::skipAnimations()
+{
+    m_emailBox.settle();
+    m_passBox.settle();
+}
 
-        auto drawLabel = [&](const std::string& s, float y, bool active) {
-            Theme::drawText(window, font, s, Theme::Type::LABEL,
-                            active ? Theme::SUCCESS : Theme::TEXT_MUTED,
-                            {fX + 2.f, cY + y}, sf::Text::Bold);
-        };
-        drawLabel("GMAIL ADDRESS", Y_LABEL1, focus == F_EMAIL);
-        drawLabel("PASSWORD",      Y_LABEL2, focus == F_PASS);
+void UserRegistrationScreen::draw(sf::RenderTarget& target)
+{
+    const float cW = std::min(480.f, m_size.x - 60.f);
+    const float cH = CARD_H;
+    const float cX = std::round((m_size.x - cW) * 0.5f);
+    const float cY = std::round((m_size.y - cH) * 0.5f);
+    const float fX = cX + 28.f;
+    const float fW = cW - 56.f;
 
-        emailBox.draw(window);
-        passBox.draw(window);
+    Theme::drawBackdrop(target, m_size.x, m_size.y, Theme::SUCCESS, Theme::ACCENT);
 
-        // Requirement moved out of the label into its own quiet hint line.
-        Theme::drawText(window, font, "Must end in @gmail.com", Theme::Type::CAPTION,
-                        Theme::TEXT_ROUTE, {fX + 2.f, cY + Y_HINT});
+    Theme::drawCardElevated(target, {cX, cY}, {cW, cH}, Theme::BG_CARD, 16.f, 26.f, 15);
 
-        regBtn.draw(window);
-        backBtn.draw(window);
+    Theme::fillRoundedRectV(target, {cX + 18.f, cY + 1.f}, {cW - 36.f, 3.f}, 1.5f,
+                            Theme::SUCCESS, Theme::SUCCESS_DARK);
 
-        if (!infoText.empty()) {
-            sf::Color c = infoIsError ? Theme::DANGER_HOVER : Theme::SUCCESS;
-            sf::CircleShape dot(3.f, 16);
-            dot.setFillColor(c);
-            dot.setPosition(Theme::px(fX + 2.f, cY + Y_INFO + 5.f));
-            window.draw(dot);
-            Theme::drawText(window, font, infoText, Theme::Type::META, c,
-                            {fX + 14.f, cY + Y_INFO}, sf::Text::Bold);
-        }
+    Theme::drawIconCircle(target, m_font, {cX + cW * 0.5f, cY + Y_ICON},
+                          23.f, Theme::withAlpha(Theme::SUCCESS, 55),
+                          "+", Theme::SUCCESS, 23);
 
-        window.display();
+    Theme::drawTextHCentered(target, m_font, "Create Account", Theme::Type::TITLE,
+                             Theme::TEXT_PRIMARY, cX + cW * 0.5f, cY + Y_TITLE,
+                             sf::Text::Bold);
+    Theme::drawTextHCentered(target, m_font, "One account, every route on campus",
+                             Theme::Type::META, Theme::TEXT_MUTED,
+                             cX + cW * 0.5f, cY + Y_SUB);
+
+    Theme::drawSeparatorSoft(target, cX + 28.f, cY + Y_RULE, cW - 56.f);
+
+    auto drawLabel = [&](const std::string& s, float y, bool active) {
+        Theme::drawText(target, m_font, s, Theme::Type::LABEL,
+                        active ? Theme::SUCCESS : Theme::TEXT_MUTED,
+                        {fX + 2.f, cY + y}, sf::Text::Bold);
+    };
+    drawLabel("GMAIL ADDRESS", Y_LABEL1, m_focus == F_EMAIL);
+    drawLabel("PASSWORD",      Y_LABEL2, m_focus == F_PASS);
+
+    m_emailBox.draw(target);
+    m_passBox.draw(target);
+
+    Theme::drawText(target, m_font, "Must end in @gmail.com", Theme::Type::CAPTION,
+                    Theme::TEXT_ROUTE, {fX + 2.f, cY + Y_HINT});
+
+    Button regBtn (m_font, "Create Account", {fW * 0.58f, FIELD_H}, {fX, cY + Y_BUTTONS},
+                   ButtonStyle::SUCCESS);
+    Button backBtn(m_font, "< Back",         {fW * 0.36f, FIELD_H},
+                   {fX + fW * 0.62f, cY + Y_BUTTONS}, ButtonStyle::SECONDARY);
+    regBtn.setFocused(m_focus == F_REGISTER);
+    backBtn.setFocused(m_focus == F_BACK);
+    regBtn.setHoverT(m_regHoverT);
+    backBtn.setHoverT(m_backHoverT);
+    regBtn.draw(target);
+    backBtn.draw(target);
+
+    if (!m_infoText.empty())
+    {
+        sf::Color c = m_infoIsError ? Theme::DANGER_HOVER : Theme::SUCCESS;
+        sf::CircleShape dot(3.f, 16);
+        dot.setFillColor(c);
+        dot.setPosition(Theme::px(fX + 2.f, cY + Y_INFO + 5.f));
+        target.draw(dot);
+        Theme::drawText(target, m_font, m_infoText, Theme::Type::META, c,
+                        {fX + 14.f, cY + Y_INFO}, sf::Text::Bold);
     }
 }

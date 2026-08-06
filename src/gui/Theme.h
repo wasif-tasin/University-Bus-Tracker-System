@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <system_error>
 #include <vector>
 
 namespace Theme {
@@ -14,16 +16,14 @@ inline constexpr float PI = 3.14159265358979f;
 
 inline const sf::Color BG_DARK          = sf::Color(15,  22,  40 );
 inline const sf::Color BG_CARD          = sf::Color(26,  37,  64 );
-inline const sf::Color BG_CARD_HOVER    = sf::Color(34,  50,  86 );
+inline const sf::Color BG_CARD_DARK     = sf::Color(20,  28,  50 );
 inline const sf::Color BG_HEADER        = sf::Color(10,  15,  28 );
-inline const sf::Color BG_SIDEBAR       = sf::Color(13,  18,  32 );
 
 inline const sf::Color ACCENT           = sf::Color(59,  130, 246);
 inline const sf::Color ACCENT_HOVER     = sf::Color(96,  165, 250);
 inline const sf::Color ACCENT_PRESSED   = sf::Color(37,  99,  235);
-inline const sf::Color ACCENT_DIM       = sf::Color(59,  130, 246,  50);
 
-inline const sf::Color SUCCESS          = sf::Color(34,  197, 94 );
+inline const sf::Color SUCCESS        = sf::Color(34,  197, 94 );
 inline const sf::Color SUCCESS_DARK     = sf::Color(22,  163, 74 );
 inline const sf::Color DANGER           = sf::Color(239, 68,  68 );
 inline const sf::Color DANGER_HOVER     = sf::Color(248, 113, 113);
@@ -32,9 +32,8 @@ inline const sf::Color WARNING          = sf::Color(234, 179, 8  );
 
 inline const sf::Color PURPLE           = sf::Color(124, 58,  237);
 inline const sf::Color PURPLE_HOVER     = sf::Color(139, 92,  246);
-inline const sf::Color PURPLE_DIM       = sf::Color(124, 58,  237,  50);
 
-inline const sf::Color TEXT_PRIMARY     = sf::Color(255, 255, 255); 
+inline const sf::Color TEXT_PRIMARY     = sf::Color(255, 255, 255);
 inline const sf::Color TEXT_SECONDARY   = sf::Color(215, 220, 231);
 inline const sf::Color TEXT_MUTED       = sf::Color(154, 164, 181);
 inline const sf::Color TEXT_ROUTE       = sf::Color(138, 149, 168);
@@ -57,17 +56,13 @@ inline const sf::Color ITEM_SELECTED    = sf::Color(29,  78,  216);
 inline const sf::Color SIDEBAR_HOVER    = sf::Color(28,  40,  68 );
 inline const sf::Color SIDEBAR_SELECTED = sf::Color(29,  78,  216);
 
-// --- Extra tokens for the richer visual style ---------------------------
-// Deeper backdrop stops so gradients have somewhere to travel to.
 inline const sf::Color BG_DEEP          = sf::Color(8,   12,  24 );
-inline const sf::Color BG_VIGNETTE      = sf::Color(4,   7,   16 );
-// A second hue lets accents run as a gradient instead of a flat fill.
+
 inline const sf::Color ACCENT_CYAN      = sf::Color(34,  211, 238);
 inline const sf::Color ACCENT_INDIGO    = sf::Color(99,  102, 241);
 inline const sf::Color PURPLE_PINK      = sf::Color(217, 70,  239);
-// Hairline highlight along the top of raised surfaces.
+
 inline const sf::Color SHEEN            = sf::Color(255, 255, 255, 16);
-inline const sf::Color SHADOW           = sf::Color(0,   0,   0,   70);
 
 inline sf::Vector2f px(float x, float y) {
     return { std::round(x), std::round(y) };
@@ -79,14 +74,14 @@ inline sf::Vector2f px(sf::Vector2f v) {
 inline void drawEyeIcon(sf::RenderTarget& target, sf::Vector2f center,
                          float size, bool slashed, sf::Color col)
 {
-    const int  N  = 14;        
-    const float w = size;        
+    const int  N  = 14;
+    const float w = size;
     const float h = size * 0.55f;
 
     sf::VertexArray topArc(sf::PrimitiveType::LineStrip, N);
     sf::VertexArray botArc(sf::PrimitiveType::LineStrip, N);
     for (int i = 0; i < N; ++i) {
-        float t   = static_cast<float>(i) / (N - 1);      
+        float t   = static_cast<float>(i) / (N - 1);
         float x   = center.x - w + 2.f * w * t;
         float yarc= -h * std::sin(3.14159265358979f * t);
         topArc[i].position = {x, center.y + yarc};
@@ -115,19 +110,14 @@ inline void drawEyeIcon(sf::RenderTarget& target, sf::Vector2f center,
     }
 }
 
-inline void configureFont(sf::Font& font) {
-    font.setSmooth(false);
-}
-inline bool loadUIFont(sf::Font& font) {
+inline bool loadUiFont(sf::Font& font) {
     if (!font.openFromFile("assets/Inter-Regular.ttf") &&
         !font.openFromFile("assets/Roboto-Regular.ttf"))
         return false;
-    configureFont(font);
+    font.setSmooth(false);
     return true;
 }
 
-// Multisampling -- without this every rounded corner and circle is visibly
-// stair-stepped. Pass to every RenderWindow this app opens.
 inline sf::ContextSettings uiContext() {
     sf::ContextSettings s;
     s.antiAliasingLevel = 8;
@@ -140,27 +130,108 @@ inline void syncViewToWindow(sf::RenderWindow& window, const sf::Event& event) {
             {static_cast<float>(r->size.x), static_cast<float>(r->size.y)})));
 }
 
-
-namespace Type {
-    inline constexpr unsigned DISPLAY   = 30;  
-    inline constexpr unsigned TITLE     = 25; 
-    inline constexpr unsigned BUS_NAME  = 23; 
-    inline constexpr unsigned BADGE_BUS = 21;  
-    inline constexpr unsigned HEADING   = 20; 
-    inline constexpr unsigned BADGE_UNI = 19; 
-    inline constexpr unsigned SUBTITLE  = 17;  
-    inline constexpr unsigned BODY      = 15; 
-    inline constexpr unsigned META      = 14; 
-    inline constexpr unsigned ROUTE     = 13; 
-    inline constexpr unsigned LABEL     = 12; 
-    inline constexpr unsigned CAPTION   = 11;  
-
-    inline constexpr float LEADING_BODY = 1.35f; 
+inline sf::Texture& backgroundTexture() {
+    static sf::Texture tex;
+    return tex;
 }
 
+inline bool& backgroundReady() {
+    static bool ready = false;
+    return ready;
+}
+
+inline void loadBackgroundImage() {
+    static bool tried = false;
+    if (tried) return;
+    tried = true;
+
+    static const char* const candidates[] = {
+        "assets/background.png",
+        "assets/background.jpg",
+        "assets/background.jpeg",
+    };
+
+    sf::Texture& tex = backgroundTexture();
+    for (const char* path : candidates) {
+        std::error_code ec;
+        if (!std::filesystem::exists(path, ec) || ec) continue;
+        if (tex.loadFromFile(path)) {
+            tex.setSmooth(true);
+            backgroundReady() = true;
+            return;
+        }
+    }
+}
+
+inline bool drawBackgroundImage(sf::RenderTarget& target, sf::Vector2f size,
+                                 std::uint8_t scrim = 145)
+{
+    loadBackgroundImage();
+    if (!backgroundReady()) return false;
+
+    const sf::Texture& tex = backgroundTexture();
+    const sf::Vector2u ts  = tex.getSize();
+    if (ts.x == 0 || ts.y == 0) return false;
+
+    const float scale = std::max(size.x / static_cast<float>(ts.x),
+                                 size.y / static_cast<float>(ts.y));
+
+    sf::Sprite spr(tex);
+    spr.setScale({scale, scale});
+    spr.setPosition({(size.x - ts.x * scale) * 0.5f,
+                     (size.y - ts.y * scale) * 0.5f});
+    target.draw(spr);
+
+    if (scrim > 0) {
+        sf::RectangleShape veil(size);
+        veil.setFillColor(sf::Color(8, 12, 24, scrim));
+        target.draw(veil);
+    }
+    return true;
+}
+
+namespace Type {
+    inline constexpr unsigned H1        = 32;
+    inline constexpr unsigned DISPLAY   = 30;
+    inline constexpr unsigned TITLE     = 25;
+    inline constexpr unsigned H3        = 24;
+    inline constexpr unsigned BUS_NAME  = 23;
+    inline constexpr unsigned BADGE_BUS = 21;
+    inline constexpr unsigned HEADING   = 20;
+    inline constexpr unsigned BADGE_UNI = 19;
+    inline constexpr unsigned INPUT     = 18;
+    inline constexpr unsigned SUBTITLE  = 17;
+    inline constexpr unsigned BODY      = 15;
+    inline constexpr unsigned SMALL     = 14;
+    inline constexpr unsigned META      = 14;
+    inline constexpr unsigned ROUTE     = 13;
+    inline constexpr unsigned LABEL     = 12;
+    inline constexpr unsigned CAPTION   = 11;
+
+    inline constexpr float LEADING_BODY = 1.35f;
+}
 
 inline sf::Color withAlpha(sf::Color c, uint8_t a) {
     return sf::Color(c.r, c.g, c.b, a);
+}
+
+inline constexpr float HOVER_RATE_IN  = 19.7f;
+inline constexpr float HOVER_RATE_OUT = 10.5f;
+
+inline float approach(float current, float target, float rate, float dt) {
+    if (dt <= 0.f) return current;
+    current += (target - current) * (1.f - std::exp(-rate * dt));
+    return (std::abs(target - current) < 0.005f) ? target : current;
+}
+
+inline float approachHover(float current, bool on, float dt) {
+    return approach(current, on ? 1.f : 0.f,
+                    on ? HOVER_RATE_IN : HOVER_RATE_OUT, dt);
+}
+
+inline float smoothstep01(float t) {
+    t = std::clamp(t, 0.f, 1.f);
+    return t * t * (3.f - 2.f * t);
 }
 
 inline sf::Color lerp(sf::Color a, sf::Color b, float t) {
@@ -245,9 +316,6 @@ inline std::string ellipsize(const sf::Font& font, const std::string& str,
     return out + "...";
 }
 
-// Rounded rect as a single triangle fan with a vertical colour ramp.
-// One draw call, smooth corners, and -- because a linear ramp in y is an
-// affine function -- barycentric interpolation reproduces it exactly.
 inline void fillRoundedRectV(sf::RenderTarget& target,
                               sf::Vector2f pos, sf::Vector2f size,
                               float radius, sf::Color topColor, sf::Color botColor,
@@ -259,10 +327,10 @@ inline void fillRoundedRectV(sf::RenderTarget& target,
 
     struct Corner { sf::Vector2f c; float a0; };
     const Corner corners[4] = {
-        {{pos.x + size.x - radius, pos.y + radius         }, -PI * 0.5f}, // top-right
-        {{pos.x + size.x - radius, pos.y + size.y - radius},  0.f      }, // bottom-right
-        {{pos.x + radius,          pos.y + size.y - radius},  PI * 0.5f}, // bottom-left
-        {{pos.x + radius,          pos.y + radius         },  PI       }, // top-left
+        {{pos.x + size.x - radius, pos.y + radius         }, -PI * 0.5f},
+        {{pos.x + size.x - radius, pos.y + size.y - radius},  0.f      },
+        {{pos.x + radius,          pos.y + size.y - radius},  PI * 0.5f},
+        {{pos.x + radius,          pos.y + radius         },  PI       },
     };
 
     std::vector<sf::Vector2f> pts;
@@ -285,7 +353,7 @@ inline void fillRoundedRectV(sf::RenderTarget& target,
         fan[i + 1].position = pts[i];
         fan[i + 1].color    = colAt(pts[i].y);
     }
-    fan[pts.size() + 1] = fan[1];      // close the ring
+    fan[pts.size() + 1] = fan[1];
     target.draw(fan);
 }
 
@@ -296,7 +364,6 @@ inline void fillRoundedRect(sf::RenderTarget& target,
     fillRoundedRectV(target, pos, size, radius, color, color);
 }
 
-// Stacked translucent rounded rects -- the overlap builds a smooth falloff.
 inline void drawShadow(sf::RenderTarget& target,
                         sf::Vector2f pos, sf::Vector2f size, float radius,
                         float spread = 14.f, std::uint8_t strength = 18,
@@ -312,7 +379,6 @@ inline void drawShadow(sf::RenderTarget& target,
     }
 }
 
-// Same idea as drawShadow but coloured and centred -- a focus/attention halo.
 inline void drawGlow(sf::RenderTarget& target,
                       sf::Vector2f pos, sf::Vector2f size, float radius,
                       sf::Color color, float spread = 10.f,
@@ -328,7 +394,6 @@ inline void drawGlow(sf::RenderTarget& target,
     }
 }
 
-// Soft ambient light blob for backdrops: opaque-ish core fading to nothing.
 inline void drawRadialGlow(sf::RenderTarget& target, sf::Vector2f center,
                             float radius, sf::Color color,
                             std::uint8_t centerAlpha, int segments = 56)
@@ -361,7 +426,6 @@ inline void drawRoundedRect(sf::RenderTarget& target,
     fillRoundedRect(target, pos, size, radius, fillColor);
 }
 
-// Rounded rect with a vertical fill ramp plus an optional ring border.
 inline void drawRoundedRectV(sf::RenderTarget& target,
                               sf::Vector2f pos, sf::Vector2f size,
                               float radius, sf::Color topColor, sf::Color botColor,
@@ -381,8 +445,7 @@ inline void drawCard(sf::RenderTarget& target,
                      sf::Vector2f pos, sf::Vector2f size,
                      sf::Color color = BG_CARD, float radius = 10.f)
 {
-    // Top-lit gradient plus a hairline sheen, so a surface reads as raised
-    // rather than as a flat fill.
+
     fillRoundedRectV(target, pos, size, radius,
                      lerp(color, sf::Color::White, 0.06f),
                      lerp(color, sf::Color::Black, 0.10f));
@@ -392,7 +455,6 @@ inline void drawCard(sf::RenderTarget& target,
                         0.f, SHEEN);
 }
 
-// Card with a drop shadow underneath -- for hero surfaces that should float.
 inline void drawCardElevated(sf::RenderTarget& target,
                              sf::Vector2f pos, sf::Vector2f size,
                              sf::Color color = BG_CARD, float radius = 12.f,
@@ -402,17 +464,6 @@ inline void drawCardElevated(sf::RenderTarget& target,
     drawCard(target, pos, size, color, radius);
 }
 
-inline void drawSeparator(sf::RenderTarget& target,
-                           float x, float y, float w,
-                           sf::Color color = BORDER_IDLE)
-{
-    sf::RectangleShape line({w, 1.f});
-    line.setPosition(px(x, y));
-    line.setFillColor(color);
-    target.draw(line);
-}
-
-// Hairline that fades out at both ends -- reads far softer than a hard rule.
 inline void drawSeparatorSoft(sf::RenderTarget& target,
                                float x, float y, float w,
                                sf::Color color = BORDER_IDLE)
@@ -434,7 +485,7 @@ inline void drawAccentBar(sf::RenderTarget& target,
                            float x, float y, float h,
                            sf::Color color = ACCENT, float w = 4.f)
 {
-    // Inset pill: sits inside the card's rounded corner instead of poking past it.
+
     float inset = std::min(12.f, h * 0.14f);
     fillRoundedRectV(target, px(x + 2.f, y + inset), {w, h - 2.f * inset}, w * 0.5f,
                      lerp(color, sf::Color::White, 0.32f), color);
@@ -501,13 +552,20 @@ inline void drawGradientRect(sf::RenderTarget& target,
     target.draw(quad);
 }
 
+inline void drawAppBase(sf::RenderTarget& target, sf::Vector2f size,
+                        sf::Color top = BG_DARK, sf::Color bottom = BG_DEEP,
+                        std::uint8_t scrim = 145)
+{
+    if (drawBackgroundImage(target, size, scrim)) return;
+    drawGradientRect(target, {0.f, 0.f}, size, top, bottom);
+}
+
 inline void drawIconCircle(sf::RenderTarget& target, const sf::Font& font,
                             sf::Vector2f center, float radius,
                             sf::Color circleColor, const std::string& letter,
                             sf::Color letterColor, unsigned letterSize = 20)
 {
-    // Soft halo, then a gradient disc with a bright rim -- gives the badge
-    // some dimension instead of reading as a flat dot.
+
     drawRadialGlow(target, center, radius * 2.3f, letterColor, 30);
 
     sf::CircleShape ring(radius, 48);
@@ -534,10 +592,12 @@ inline void drawIconCircle(sf::RenderTarget& target, const sf::Font& font,
                      sf::Text::Bold);
 }
 
-// Full-window backdrop: vertical ramp plus two ambient light blobs.
 inline void drawBackdrop(sf::RenderTarget& target, float w, float h,
                           sf::Color glowA = ACCENT, sf::Color glowB = PURPLE)
 {
+
+    if (drawBackgroundImage(target, {w, h})) return;
+
     drawGradientRect(target, {0.f, 0.f}, {w, h}, BG_DARK, BG_DEEP);
     const float r = std::max(w, h);
     drawRadialGlow(target, {w * 0.16f, h * 0.08f}, r * 0.60f, glowA, 30);
@@ -557,23 +617,20 @@ inline void drawGradientRectH(sf::RenderTarget& target,
     target.draw(quad);
 }
 
-// --- Dashboard chrome, shared by the admin and user dashboards ----------
-
 inline void drawSidebarBackdrop(sf::RenderTarget& target, float w, float h,
                                  sf::Color glow = ACCENT)
 {
     drawGradientRect(target, {0.f, 0.f}, {w, h},
                      sf::Color(19, 27, 50), sf::Color(9, 13, 26));
     drawRadialGlow(target, {w * 0.5f, h * 0.10f}, w * 1.5f, glow, 26);
-    // Glowing seam down the right edge, brightest at the top.
+
     fillRoundedRectV(target, {w - 1.5f, 0.f}, {1.5f, h}, 0.f,
                      withAlpha(glow, 100), withAlpha(glow, 25));
-    // Content tucks under the sidebar.
+
     drawGradientRectH(target, {w, 0.f}, {10.f, h},
                       sf::Color(0, 0, 0, 60), sf::Color(0, 0, 0, 0));
 }
 
-// Rounded pill highlight plus a left accent tab for one sidebar row.
 inline void drawNavItem(sf::RenderTarget& target, float sidebarW,
                          float y, float h, bool active, bool hovered,
                          sf::Color accent = ACCENT)
@@ -595,7 +652,6 @@ inline void drawHeaderBar(sf::RenderTarget& target, float x, float w, float h,
 {
     drawGradientRect(target, {x, 0.f}, {w, h}, sf::Color(15, 21, 38), BG_HEADER);
 
-    // Gradient underline rather than a flat accent rule.
     sf::VertexArray line(sf::PrimitiveType::TriangleStrip, 6);
     const float y0 = h - 2.f, y1 = h;
     const sf::Color midC = lerp(accent, accent2, 0.5f);
@@ -607,7 +663,6 @@ inline void drawHeaderBar(sf::RenderTarget& target, float x, float w, float h,
     line[5].position = {x + w,         y1}; line[5].color = withAlpha(accent2, 130);
     target.draw(line);
 
-    // Content scrolls under the header.
     drawGradientRect(target, {x, h}, {w, 10.f},
                      sf::Color(0, 0, 0, 55), sf::Color(0, 0, 0, 0));
 }
@@ -634,7 +689,6 @@ inline void drawInfoToast(sf::RenderTarget& target, const sf::Font& font,
                      withAlpha(base, static_cast<uint8_t>(242 * alpha)),
                      1.f, withAlpha(edge, static_cast<uint8_t>(150 * alpha)));
 
-    // Status dot, then the message beside it.
     float dotR = 4.f;
     sf::CircleShape dot(dotR, 20);
     dot.setFillColor(withAlpha(edge, static_cast<uint8_t>(255 * alpha)));
@@ -646,6 +700,22 @@ inline void drawInfoToast(sf::RenderTarget& target, const sf::Font& font,
                      {{tx + 16.f, ty}, {tw - 16.f, th}}, sf::Text::Bold);
 }
 
-} 
+inline void drawAppBackground(sf::RenderTarget& target, sf::Vector2f size)
+{
+    drawAppBase(target, size, BG_DEEP, BG_DARK);
+}
 
-#endif 
+inline void drawChevron(sf::RenderTarget& target, sf::Vector2f pos, float size,
+                        sf::Color color)
+{
+    sf::VertexArray arrow(sf::PrimitiveType::LineStrip, 3);
+    arrow[0].position = {pos.x, pos.y - size};
+    arrow[1].position = {pos.x + size, pos.y};
+    arrow[2].position = {pos.x, pos.y + size};
+    arrow[0].color = arrow[1].color = arrow[2].color = color;
+    target.draw(arrow);
+}
+
+}
+
+#endif

@@ -1,271 +1,605 @@
 #include "GUI.h"
-#include "Button.h"
-#include "Theme.h"
 #include "AdminLoginGUI.h"
-#include "UserPanelGUI.h"
+#include "ScreenManager.h"
+#include "Theme.h"
+#include "UserLoginGUI.h"
 
-#include <SFML/Graphics.hpp>
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
+#include <string>
 
 namespace {
-// Keyboard focus order: Up/Down/Tab move, Enter opens.
-// Starts at F_NONE so nothing looks pre-selected before the user acts.
-enum Focus { F_NONE = -1, F_USER = 0, F_ADMIN, F_EXIT, F_COUNT };
+
+constexpr float INTRO_SECONDS = 0.9f;
+
+struct Logo
+{
+    sf::Texture tex;
+    bool        ready = false;
+};
+
+Logo &logo()
+{
+    static Logo l;
+    static bool tried = false;
+    if (!tried)
+    {
+        tried = true;
+        if (l.tex.loadFromFile("assets/logo.png"))
+        {
+            l.tex.setSmooth(true);
+            l.ready = true;
+        }
+    }
+    return l;
+}
+
+sf::Color fadeC(sf::Color c, float a)
+{
+    return Theme::withAlpha(
+        c, static_cast<std::uint8_t>(std::lround(c.a * std::clamp(a, 0.f, 1.f))));
+}
+
+sf::Text fitText(const sf::Font &font, const std::string &str, unsigned cs,
+                 unsigned minCs, float maxW, sf::Color col,
+                 std::uint32_t style = sf::Text::Regular, float spacing = 1.f)
+{
+    sf::Text t(font);
+    t.setString(str);
+    t.setCharacterSize(std::max(cs, minCs));
+    t.setFillColor(col);
+    t.setStyle(style);
+    t.setLetterSpacing(spacing);
+
+    while (t.getCharacterSize() > minCs && t.getLocalBounds().size.x > maxW)
+        t.setCharacterSize(t.getCharacterSize() - 1);
+    return t;
+}
+
+void drawCrownIcon(sf::RenderTarget &target, sf::Vector2f pos, float size,
+                   sf::Color color)
+{
+    const float w = size, h = size * 0.86f;
+    auto P = [&](float u, float v) {
+        return sf::Vector2f{pos.x + u * w, pos.y + v * h};
+    };
+
+    const float baseTop = 0.62f;
+    const float tri[3][3][2] = {
+        {{0.00f, baseTop}, {0.34f, baseTop}, {0.10f, 0.06f}},
+        {{0.22f, baseTop}, {0.78f, baseTop}, {0.50f, 0.00f}},
+        {{0.66f, baseTop}, {1.00f, baseTop}, {0.90f, 0.06f}},
+    };
+
+    sf::VertexArray peaks(sf::PrimitiveType::Triangles, 9);
+    for (int t = 0; t < 3; ++t)
+        for (int v = 0; v < 3; ++v)
+        {
+            peaks[t * 3 + v].position = P(tri[t][v][0], tri[t][v][1]);
+            peaks[t * 3 + v].color    = color;
+        }
+    target.draw(peaks);
+
+    Theme::fillRoundedRect(target, P(0.f, baseTop - 0.04f),
+                           {w, h * 0.42f}, h * 0.11f,
+                           Theme::lerp(color, sf::Color::White, 0.22f));
+
+    const float gemR = std::max(1.2f, size * 0.075f);
+    for (float u : {0.10f, 0.50f, 0.90f})
+    {
+        sf::CircleShape gem(gemR, 12);
+        gem.setOrigin({gemR, gemR});
+        gem.setFillColor(Theme::lerp(color, sf::Color::White, 0.45f));
+        gem.setPosition(Theme::px(P(u, u == 0.50f ? 0.00f : 0.06f)));
+        target.draw(gem);
+    }
+}
+
+void drawTeamIcon(sf::RenderTarget &target, sf::Vector2f pos, float size,
+                  sf::Color color)
+{
+    auto person = [&](float cx, float top, float s, sf::Color c) {
+        const float headR = s * 0.20f;
+        sf::CircleShape head(headR, 20);
+        head.setOrigin({headR, headR});
+        head.setFillColor(c);
+        head.setPosition(Theme::px(pos.x + cx, pos.y + top + headR));
+        target.draw(head);
+
+        const float bw = s * 0.56f, bh = s * 0.34f;
+        Theme::fillRoundedRect(target,
+                               {pos.x + cx - bw * 0.5f, pos.y + top + headR * 2.f + s * 0.06f},
+                               {bw, bh}, bw * 0.42f, c);
+    };
+
+    person(size * 0.66f, size * 0.10f, size * 0.82f, Theme::withAlpha(color, color.a / 2));
+    person(size * 0.36f, size * 0.16f, size,        color);
+}
+
+}
+
+HomeScreen::HomeScreen(sf::Font &font)
+    : m_font(font),
+      m_exitBtn(font, "Exit", {150.f, 46.f}, {0.f, 0.f}, ButtonStyle::GHOST, 10.f),
+      m_focus(0), m_card1T(0.f), m_card2T(0.f), m_introT(0.f)
+{}
+
+void HomeScreen::prepare(sf::Vector2f size, sf::Vector2f mouse)
+{
+    Screen::prepare(size, mouse);
+
+    const bool wide = size.x >= 900.f;
+
+    m_leftW  = wide ? size.x * 0.46f : 0.f;
+    m_rightX = m_leftW;
+    m_rightW = size.x - m_leftW;
+
+    m_cardW = std::min(m_rightW - 88.f, 420.f);
+    m_cardH = std::clamp(size.y * 0.19f, 96.f, 132.f);
+    m_cardX = m_rightX + (m_rightW - m_cardW) * 0.5f;
+
+    const float gap   = 22.f;
+    const float block = m_cardH * 2.f + gap;
+    const float top   = std::max(size.y * 0.30f, (size.y - block) * 0.5f);
+
+    m_card1Y = top;
+    m_card2Y = top + m_cardH + gap;
+
+    m_card1Hover = sf::FloatRect{{m_cardX, m_card1Y}, {m_cardW, m_cardH}}.contains(mouse);
+    m_card2Hover = sf::FloatRect{{m_cardX, m_card2Y}, {m_cardW, m_cardH}}.contains(mouse);
+
+    m_exitBtn.setPosition({m_cardX + (m_cardW - 150.f) * 0.5f, m_card2Y + m_cardH + 34.f});
+}
+
+void HomeScreen::step(int delta)
+{
+
+    m_focus = (m_focus + delta + 3) % 3;
+    m_exitBtn.setFocused(m_focus == 2);
+}
+
+void HomeScreen::openUserPanel()
+{
+    m_app->push(std::make_unique<UserLoginScreen>(m_font));
+}
+
+void HomeScreen::openAdminPanel()
+{
+    m_app->push(std::make_unique<AdminLoginScreen>(m_font));
+}
+
+void HomeScreen::handleEvent(const sf::Event &event)
+{
+    if (const auto *key = event.getIf<sf::Event::KeyPressed>())
+    {
+        switch (key->code)
+        {
+            case sf::Keyboard::Key::Tab:
+            case sf::Keyboard::Key::Down:
+            case sf::Keyboard::Key::Right: step(+1); return;
+
+            case sf::Keyboard::Key::Up:
+            case sf::Keyboard::Key::Left:  step(-1); return;
+
+            case sf::Keyboard::Key::Enter:
+                if (m_focus == 0)      openUserPanel();
+                else if (m_focus == 1) openAdminPanel();
+                else                   m_app->quit();
+                return;
+
+            case sf::Keyboard::Key::Escape: m_app->quit(); return;
+            default: return;
+        }
+    }
+
+    if (const auto *mb = event.getIf<sf::Event::MouseButtonPressed>())
+    {
+        if (mb->button != sf::Mouse::Button::Left) return;
+
+        if (m_card1Hover)                    openUserPanel();
+        else if (m_card2Hover)               openAdminPanel();
+        else if (m_exitBtn.isClicked(m_mouse)) m_app->quit();
+    }
+}
+
+void HomeScreen::update(float dt)
+{
+
+    m_card1T = Theme::approachHover(m_card1T, m_card1Hover || m_focus == 0, dt);
+    m_card2T = Theme::approachHover(m_card2T, m_card2Hover || m_focus == 1, dt);
+
+    if (m_introT < 1.f)
+        m_introT = std::min(1.f, m_introT + dt / INTRO_SECONDS);
+
+    m_exitBtn.update(m_mouse, dt);
+}
+
+void HomeScreen::skipAnimations()
+{
+    m_card1T = (m_card1Hover || m_focus == 0) ? 1.f : 0.f;
+    m_card2T = (m_card2Hover || m_focus == 1) ? 1.f : 0.f;
+    m_introT = 1.f;
+    m_exitBtn.settle();
+}
+
+void HomeScreen::draw(sf::RenderTarget &target)
+{
+    Theme::drawAppBackground(target, m_size);
+
+    const bool wide = m_leftW > 0.f;
+
+    if (wide)
+    {
+        drawInfoPanel(target);
+    }
+    else
+    {
+
+        Theme::drawCenteredText(target, m_font, "University Bus Tracker",
+                                Theme::Type::H1, Theme::TEXT_PRIMARY,
+                                {{0.f, m_card1Y - 96.f}, {m_size.x, 44.f}},
+                                sf::Text::Bold);
+        Theme::drawCenteredText(target, m_font, "Choose how you want to sign in",
+                                Theme::Type::BODY, Theme::TEXT_MUTED,
+                                {{0.f, m_card1Y - 50.f}, {m_size.x, 24.f}});
+    }
+
+    auto card = [&](float y, float lit, const std::string &heading,
+                    const std::string &detail, sf::Color accent) {
+        const float e    = Theme::smoothstep01(lit);
+        const float lift = 3.f * e;
+
+        sf::Vector2f pos{m_cardX, y - lift};
+        sf::Vector2f dim{m_cardW, m_cardH};
+
+        Theme::drawShadow(target, pos, dim, 14.f,
+                          10.f + 8.f * e,
+                          static_cast<std::uint8_t>(20 + 16 * e),
+                          4.f + 3.f * e, 5);
+
+        Theme::drawRoundedRectV(target, pos, dim, 14.f,
+                                Theme::lerp(Theme::BG_CARD, Theme::ITEM_HOVER, e),
+                                Theme::lerp(Theme::BG_CARD_DARK, Theme::BG_CARD, e),
+                                1.5f,
+                                Theme::lerp(Theme::BORDER_IDLE, accent, 0.85f * e));
+
+        Theme::fillRoundedRect(target, {pos.x, pos.y + m_cardH * (0.5f - 0.2f - 0.15f * e)},
+                               {3.f, m_cardH * (0.4f + 0.3f * e)}, 1.5f,
+                               Theme::withAlpha(accent,
+                                                static_cast<std::uint8_t>(120 + 135 * e)));
+
+        const float padX = 26.f;
+        Theme::drawText(target, m_font, heading, Theme::Type::H3,
+                        Theme::TEXT_PRIMARY,
+                        {pos.x + padX, pos.y + m_cardH * 0.5f - 26.f}, sf::Text::Bold);
+        Theme::drawText(target, m_font, detail, Theme::Type::BODY,
+                        Theme::TEXT_SECONDARY,
+                        {pos.x + padX, pos.y + m_cardH * 0.5f + 6.f},
+                        sf::Text::Bold);
+
+        Theme::drawChevron(target, {pos.x + m_cardW - padX - 8.f + 6.f * e,
+                                    pos.y + m_cardH * 0.5f},
+                           9.f, Theme::withAlpha(Theme::TEXT_MUTED,
+                                                 static_cast<std::uint8_t>(120 + 135 * e)));
+    };
+
+    card(m_card1Y, m_card1T, "Student",
+         "Track live buses and plan your trip", Theme::ACCENT);
+    card(m_card2Y, m_card2T, "Administrator",
+         "Manage universities, buses and routes", Theme::PURPLE);
+
+    m_exitBtn.draw(target);
+}
+
+float HomeScreen::paintInfo(sf::RenderTarget &target, float x, float w,
+                            float y0, float k, bool measure)
+{
+    const float cx = x + w * 0.5f;
+    float y = y0;
+    int   blk = 0;
+
+    auto CS = [&](float v) {
+        return static_cast<unsigned>(std::max(9.f, std::round(v * k)));
+    };
+    auto SP = [&](float v) { return std::round(v * k); };
+
+    auto stage = [&](int i) {
+        return Theme::smoothstep01(
+            std::clamp((m_introT - 0.06f * i) / 0.42f, 0.f, 1.f));
+    };
+
+    auto driftY = [&](float a) { return (1.f - a) * SP(12.f); };
+
+    auto centered = [&](const std::string &s, unsigned cs, unsigned minCs,
+                        sf::Color col, std::uint32_t style, float spacing,
+                        float advance, int b) {
+        if (!measure)
+        {
+            const float a = stage(b);
+            sf::Text t = fitText(m_font, s, cs, minCs, w, fadeC(col, a), style, spacing);
+            const sf::FloatRect bb = t.getLocalBounds();
+            t.setPosition(Theme::px(cx - (bb.position.x + bb.size.x * 0.5f),
+                                    y + driftY(a)));
+            target.draw(t);
+        }
+        y += advance;
+    };
+
+    auto leftLine = [&](const std::string &s, float lx, float lw, unsigned cs,
+                        unsigned minCs, sf::Color col, std::uint32_t style,
+                        float spacing, float advance, int b) {
+        if (!measure)
+        {
+            const float a = stage(b);
+            sf::Text t = fitText(m_font, s, cs, minCs, lw, fadeC(col, a), style, spacing);
+            t.setPosition(Theme::px(lx - t.getLocalBounds().position.x, y + driftY(a)));
+            target.draw(t);
+        }
+        y += advance;
+    };
+
+    {
+
+        const float ls = std::min(std::clamp(w * 0.98f, 352.f, 424.f)
+                                      * std::sqrt(std::clamp(k, 0.f, 1.f)),
+                                  w * 0.98f);
+        if (!measure)
+        {
+            const float a  = stage(blk);
+            const float cy = y + ls * 0.5f + driftY(a);
+
+            Theme::drawRadialGlow(target, {cx, cy}, ls * 0.95f, Theme::ACCENT,
+                                  static_cast<std::uint8_t>(48 * a));
+
+            Logo &lg = logo();
+            if (lg.ready)
+            {
+                const sf::Vector2u ts = lg.tex.getSize();
+                const float s = ls / std::max(1.f, static_cast<float>(std::max(ts.x, ts.y)));
+                sf::Sprite spr(lg.tex);
+                spr.setScale({s, s});
+                spr.setColor(sf::Color(255, 255, 255,
+                                       static_cast<std::uint8_t>(255 * a)));
+                spr.setPosition(Theme::px(cx - ts.x * s * 0.5f, cy - ts.y * s * 0.5f));
+                target.draw(spr);
+            }
+            else
+            {
+
+                Theme::drawIconCircle(target, m_font, {cx, cy}, ls * 0.5f,
+                                      fadeC(Theme::ACCENT_PRESSED, a), "B",
+                                      fadeC(Theme::TEXT_PRIMARY, a),
+                                      static_cast<unsigned>(ls * 0.42f));
+            }
+        }
+        y += ls + SP(14.f);
+    }
+    ++blk;
+
+    {
+        const float a  = stage(blk);
+        const float l1 = SP(44.f), l2 = SP(46.f);
+
+        if (!measure)
+            Theme::drawRadialGlow(target, {cx, y + (l1 + l2) * 0.45f},
+                                  w * 0.66f, Theme::ACCENT,
+                                  static_cast<std::uint8_t>(34 * a));
+
+        centered("UNIVERSITY", CS(41.f), 21u, Theme::TEXT_PRIMARY,
+                 sf::Text::Bold, 1.01f, l1, blk);
+        centered("BUS TRACKER", CS(41.f), 21u, Theme::TEXT_PRIMARY,
+                 sf::Text::Bold, 1.01f, l2, blk);
+    }
+    ++blk;
+
+    {
+        const float a  = stage(blk);
+        const float bw = std::max(52.f, SP(78.f));
+        const float bh = std::max(3.f, SP(3.f));
+        if (!measure)
+            Theme::drawGradientRectH(target,
+                                     {std::round(cx - bw * 0.5f), y + driftY(a)},
+                                     {bw, bh},
+                                     fadeC(Theme::ACCENT, a),
+                                     fadeC(Theme::ACCENT_CYAN, a));
+        y += bh + SP(16.f);
+    }
+    ++blk;
+
+    centered("Real-time Campus Bus Management System", CS(14.f), 11u,
+             Theme::TEXT_SECONDARY, sf::Text::Bold, 1.f, SP(25.f), blk);
+
+    {
+        const float a  = stage(blk);
+        const std::string s  = "Developed by BUS(Y) CODERS";
+        const unsigned    cs = CS(13.f);
+        const float chipH = SP(30.f);
+        if (!measure)
+        {
+            sf::Text t = fitText(m_font, s, cs, 10u, w - SP(36.f),
+                                 fadeC(sf::Color(226, 236, 255), a),
+                                 sf::Text::Bold, 1.06f);
+            const sf::FloatRect bb = t.getLocalBounds();
+            const float chipW = bb.size.x + SP(34.f);
+            const float chipX = cx - chipW * 0.5f;
+            const float chipY = y + driftY(a);
+
+            Theme::drawRoundedRectV(target, {chipX, chipY}, {chipW, chipH},
+                                    chipH * 0.5f,
+                                    fadeC(sf::Color(59, 130, 246, 62), a),
+                                    fadeC(sf::Color(124, 58, 237, 62), a),
+                                    1.f, fadeC(sf::Color(120, 160, 240, 95), a));
+            t.setPosition(Theme::px(cx - (bb.position.x + bb.size.x * 0.5f),
+                                    chipY + (chipH - bb.size.y) * 0.5f - bb.position.y));
+            target.draw(t);
+        }
+        y += chipH + SP(13.f);
+    }
+    ++blk;
+
+    centered("Smart. Simple. Reliable.", CS(13.f), 11u, Theme::ACCENT_CYAN,
+             sf::Text::Bold, 1.05f, SP(24.f), blk);
+    ++blk;
+
+    if (!measure)
+        Theme::drawSeparatorSoft(target, x, y, w,
+                                 fadeC(sf::Color(120, 150, 210, 120), stage(blk)));
+    y += SP(18.f);
+
+    auto heading = [&](const std::string &label, bool crown, int b) {
+        const float ih = SP(16.f);
+        if (!measure)
+        {
+            const float a  = stage(b);
+            const float dy = driftY(a);
+            if (crown)
+                drawCrownIcon(target, {x, y + dy + SP(1.f)}, ih,
+                              fadeC(Theme::WARNING, a));
+            else
+                drawTeamIcon(target, {x, y + dy}, ih, fadeC(Theme::ACCENT_HOVER, a));
+
+            sf::Text t = fitText(m_font, label, CS(12.f), 10u,
+                                 w - ih - SP(12.f),
+                                 fadeC(Theme::TEXT_SECONDARY, a),
+                                 sf::Text::Bold, 1.10f);
+            const sf::FloatRect bb = t.getLocalBounds();
+            t.setPosition(Theme::px(x + ih + SP(12.f) - bb.position.x,
+                                    y + dy + (ih - bb.size.y) * 0.5f - bb.position.y));
+            target.draw(t);
+        }
+        y += ih + SP(10.f);
+    };
+
+    heading("PROJECT LEADER", true, blk);
+    leftLine("Md Wasif Tasin", x + SP(2.f), w - SP(2.f), CS(21.f), 13u,
+             Theme::TEXT_PRIMARY, sf::Text::Bold, 1.f, SP(36.f), blk);
+    ++blk;
+
+    heading("TEAM MEMBERS", false, blk);
+    {
+        static const char *kMembers[] = {"Nishat Mahzaben", "Nur Safrin",
+                                         "Jiaul Kabir Joy", "Samia Bhuiyan"};
+        const float rowH = SP(25.f);
+        const float dotR = std::max(2.f, SP(3.f));
+        for (const char *name : kMembers)
+        {
+            if (!measure)
+            {
+                const float a  = stage(blk);
+                const float dy = driftY(a);
+
+                sf::CircleShape dot(dotR, 16);
+                dot.setOrigin({dotR, dotR});
+                dot.setFillColor(fadeC(Theme::ACCENT_HOVER, a));
+                dot.setPosition(Theme::px(x + SP(6.f), y + dy + rowH * 0.42f));
+                target.draw(dot);
+
+                sf::Text t = fitText(m_font, name, CS(15.f), 11u,
+                                     w - SP(22.f), fadeC(Theme::TEXT_PRIMARY, a),
+                                     sf::Text::Bold, 1.f);
+                const sf::FloatRect bb = t.getLocalBounds();
+                t.setPosition(Theme::px(x + SP(20.f) - bb.position.x,
+                                        y + dy + rowH * 0.42f - bb.size.y * 0.5f - bb.position.y));
+                target.draw(t);
+            }
+            y += rowH;
+        }
+        y += SP(6.f);
+    }
+    ++blk;
+
+    if (!measure)
+        Theme::drawSeparatorSoft(target, x, y, w,
+                                 fadeC(sf::Color(120, 150, 210, 120), stage(blk)));
+    y += SP(18.f);
+
+    centered("Powered by C++17 & SFML 3", CS(12.f), 10u,
+             Theme::lerp(Theme::ACCENT_HOVER, sf::Color::White, 0.30f),
+             sf::Text::Bold, 1.f, SP(24.f), blk);
+    centered("Department of Computer Science & Engineering", CS(12.f), 10u,
+             Theme::TEXT_SECONDARY, sf::Text::Bold, 1.f, SP(20.f), blk);
+    centered("Bangladesh University of Business and Technology (BUBT)",
+             CS(12.f), 10u, Theme::TEXT_MUTED, sf::Text::Bold, 1.f,
+             SP(22.f), blk);
+
+    centered("Version 1.0", CS(11.f), 9u, Theme::TEXT_MUTED,
+             sf::Text::Bold, 1.08f, SP(13.f), blk);
+
+    return y - y0;
+}
+
+void HomeScreen::drawInfoPanel(sf::RenderTarget &target)
+{
+    const float a = Theme::smoothstep01(m_introT / 0.55f);
+
+    Theme::drawGradientRectH(target, {0.f, 0.f}, {m_leftW, m_size.y},
+                             fadeC(sf::Color(6, 10, 22, 130), a),
+                             fadeC(sf::Color(6, 10, 22, 0), a));
+    Theme::drawRadialGlow(target, {m_leftW * 0.30f, m_size.y * 0.16f},
+                          m_leftW * 0.55f, Theme::ACCENT,
+                          static_cast<std::uint8_t>(34 * a));
+    Theme::drawRadialGlow(target, {m_leftW * 0.52f, m_size.y * 0.90f},
+                          m_leftW * 0.44f, Theme::PURPLE,
+                          static_cast<std::uint8_t>(30 * a));
+
+    const float mx = std::clamp(m_leftW * 0.062f, 20.f, 40.f);
+    const float my = std::clamp(m_size.y * 0.048f, 16.f, 36.f);
+    const sf::Vector2f pos{mx, my};
+    const sf::Vector2f dim{m_leftW - 2.f * mx, m_size.y - 2.f * my};
+    if (dim.x <= 40.f || dim.y <= 40.f) return;
+
+    const float R = 22.f;
+
+    Theme::drawShadow(target, pos, dim, R, 26.f,
+                      static_cast<std::uint8_t>(15 * a), 10.f, 8);
+    Theme::drawRoundedRectV(target, pos, dim, R,
+                            fadeC(sf::Color(44, 60, 98, 148), a),
+                            fadeC(sf::Color(13, 19, 36, 196), a),
+                            1.5f, fadeC(sf::Color(140, 168, 224, 62), a));
+
+    Theme::fillRoundedRect(target, {pos.x + R, pos.y}, {dim.x - 2.f * R, 1.f},
+                           0.f, fadeC(sf::Color(255, 255, 255, 46), a));
+    Theme::drawGradientRectH(target, {pos.x + R * 0.9f, pos.y + 1.f},
+                             {dim.x - 1.8f * R, 2.f},
+                             fadeC(Theme::withAlpha(Theme::ACCENT_CYAN, 0), a),
+                             fadeC(Theme::withAlpha(Theme::ACCENT, 120), a));
+
+    const float padX = std::clamp(dim.x * 0.085f, 20.f, 34.f);
+    const float padY = std::clamp(dim.y * 0.020f, 8.f, 14.f);
+    const float innerX = pos.x + padX;
+    const float innerW = dim.x - 2.f * padX;
+    const float innerY = pos.y + padY;
+    const float innerH = dim.y - 2.f * padY;
+
+    float needH = paintInfo(target, innerX, innerW, innerY, 1.f, true);
+    float k     = 1.f;
+
+    for (int i = 0; i < 4 && needH > innerH; ++i)
+    {
+        k     = std::clamp(k * innerH / std::max(1.f, needH), 0.40f, 1.f);
+        needH = paintInfo(target, innerX, innerW, innerY, k, true);
+    }
+
+    paintInfo(target, innerX, innerW,
+              innerY + std::max(0.f, (innerH - needH) * 0.5f), k, false);
 }
 
 void GUI::run()
 {
-    sf::RenderWindow window(sf::VideoMode({980, 620}),
+
+    sf::RenderWindow window(sf::VideoMode({1180u, 760u}),
                             "University Bus Tracker",
-                            sf::Style::Default, sf::State::Windowed,
+                            sf::Style::Titlebar | sf::Style::Close | sf::Style::Resize,
+                            sf::State::Windowed,
                             Theme::uiContext());
-    window.setFramerateLimit(60);
+
+    window.setVerticalSyncEnabled(true);
+    window.setMinimumSize(sf::Vector2u{860u, 620u});
 
     sf::Font font;
-    if (!Theme::loadUIFont(font))
-    {
-        return;
-    }
+    if (!Theme::loadUiFont(font)) return;
 
-    float card1HoverT = 0.f;
-    float card2HoverT = 0.f;
-    float exitHoverT  = 0.f;
-    int focus = F_NONE;
-
-    auto step = [&](int delta) {
-        if (focus == F_NONE) focus = (delta > 0) ? F_USER : F_EXIT;
-        else                 focus = (focus + delta + F_COUNT) % F_COUNT;
-    };
-
-    while (window.isOpen())
-    {
-        auto sz = window.getSize();
-        float ww = static_cast<float>(sz.x);
-        float wh = static_cast<float>(sz.y);
-        float leftW = ww * 0.38f;
-        float rightX = leftW + 2.f;
-        float rightW = ww - rightX;
-
-        const float cardW = std::min(rightW - 50.f, 500.f);
-        const float cardH = 120.f;
-        const float cardGap = 22.f;
-        const float totalH = 2.f * cardH + cardGap;
-        float cardX = rightX + (rightW - cardW) * 0.5f;
-        float card1Y = (wh - totalH) * 0.5f;
-        float card2Y = card1Y + cardH + cardGap;
-        Button exitBtn(font, "Exit", {90.f, 34.f},
-                       {ww - 110.f, wh - 52.f}, ButtonStyle::GHOST);
-        exitBtn.setFocused(focus == F_EXIT);
-        exitBtn.setHoverT(exitHoverT);
-        auto mp = sf::Mouse::getPosition(window);
-        bool c1h = mp.x >= (int)cardX && mp.x < (int)(cardX + cardW) &&
-                   mp.y >= (int)card1Y && mp.y < (int)(card1Y + cardH);
-        bool c2h = mp.x >= (int)cardX && mp.x < (int)(cardX + cardW) &&
-                   mp.y >= (int)card2Y && mp.y < (int)(card2Y + cardH);
-
-        // Same asymmetric easing as Button: snappy in, gentler out.
-        auto ease = [](float t, bool on) {
-            float rate = on ? 0.28f : 0.16f;
-            float v = t + ((on ? 1.f : 0.f) - t) * rate;
-            return (std::abs((on ? 1.f : 0.f) - v) < 0.005f) ? (on ? 1.f : 0.f) : v;
-        };
-        card1HoverT = ease(card1HoverT, c1h);
-        card2HoverT = ease(card2HoverT, c2h);
-
-        auto openUserPanel = [&]() {
-            UserPanelGUI up;
-            up.run();
-        };
-        auto openAdminPanel = [&]() {
-            AdminLoginGUI al;
-            al.run();
-        };
-
-        while (const std::optional event = window.pollEvent())
-        {
-            if (event->is<sf::Event::Closed>())
-                window.close();
-            Theme::syncViewToWindow(window, *event);
-
-            // Pointer takes over: drop the keyboard ring so only one thing is lit.
-            if (event->is<sf::Event::MouseMoved>()) focus = F_NONE;
-
-            if (event->is<sf::Event::MouseButtonPressed>())
-            {
-                if (c1h)
-                {
-                    openUserPanel();
-                }
-                if (c2h)
-                {
-                    openAdminPanel();
-                }
-                if (exitBtn.isClicked(window))
-                    window.close();
-            }
-
-            if (const auto* kp = event->getIf<sf::Event::KeyPressed>())
-            {
-                using Key = sf::Keyboard::Key;
-                switch (kp->code)
-                {
-                    case Key::Enter:
-                        // Enter before any arrow/Tab press means "the obvious
-                        // action", which here is the user panel.
-                        if (focus == F_NONE) focus = F_USER;
-                        if      (focus == F_USER)  openUserPanel();
-                        else if (focus == F_ADMIN) openAdminPanel();
-                        else                       window.close();
-                        break;
-
-                    case Key::Tab:
-                        step(kp->shift ? -1 : 1);
-                        break;
-
-                    case Key::Down:
-                    case Key::Right:
-                        step(1);
-                        break;
-
-                    case Key::Up:
-                    case Key::Left:
-                        step(-1);
-                        break;
-
-                    case Key::Escape:
-                        window.close();
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-        }
-
-        exitBtn.update(window);
-        exitHoverT = exitBtn.hoverT();
-        window.clear(Theme::BG_DARK);
-
-        // Left brand rail: its own deeper gradient plus an ambient glow behind
-        // the logo, so the split reads as two distinct surfaces.
-        Theme::drawGradientRect(window, {0.f, 0.f}, {leftW, wh},
-                                sf::Color(20, 30, 58), sf::Color(9, 13, 26));
-        Theme::drawRadialGlow(window, {leftW * 0.5f, wh * 0.42f}, leftW * 1.05f,
-                              Theme::ACCENT, 34);
-
-        // Right pane sits slightly darker than the rail.
-        Theme::drawGradientRect(window, {rightX, 0.f}, {rightW, wh},
-                                Theme::BG_DARK, Theme::BG_DEEP);
-        Theme::drawRadialGlow(window, {rightX + rightW * 0.85f, wh * 0.9f},
-                              rightW * 0.9f, Theme::PURPLE, 26);
-
-        // Glowing seam between the two panes.
-        Theme::fillRoundedRectV(window, {leftW, 0.f}, {2.f, wh}, 0.f,
-                                Theme::withAlpha(Theme::ACCENT, 90),
-                                Theme::withAlpha(Theme::PURPLE, 70));
-
-        sf::RectangleShape topAccent({leftW, 3.f});
-        topAccent.setFillColor(Theme::ACCENT);
-        window.draw(topAccent);
-        float iconCX = leftW * 0.5f;
-        float iconCY = wh * 0.5f - 60.f;
-        Theme::fillRoundedRect(window, {iconCX - 40.f, iconCY - 40.f},
-                               {80.f, 80.f}, 40.f,
-                               Theme::withAlpha(Theme::ACCENT, 30));
-        Theme::drawIconCircle(window, font, {iconCX, iconCY},
-                              30.f, Theme::withAlpha(Theme::ACCENT, 70),
-                              "B", Theme::ACCENT_HOVER, 26);
-
-        {
-            Theme::drawTextHCentered(window, font, "University", Theme::Type::DISPLAY,
-                                     Theme::TEXT_PRIMARY, iconCX, iconCY + 56.f,
-                                     sf::Text::Bold);
-            Theme::drawTextHCentered(window, font, "Bus Tracker", Theme::Type::DISPLAY,
-                                     Theme::ACCENT, iconCX, iconCY + 94.f,
-                                     sf::Text::Bold);
-        }
-
-        {
-            Theme::drawTextHCentered(window, font, "Your campus transport,",
-                                     Theme::Type::META, Theme::TEXT_SECONDARY,
-                                     iconCX, iconCY + 142.f);
-            Theme::drawTextHCentered(window, font, "simplified.",
-                                     Theme::Type::META, Theme::TEXT_SECONDARY,
-                                     iconCX, iconCY + 164.f);
-        }
-
-        Theme::drawSeparatorSoft(window, leftW * 0.15f, wh - 42.f, leftW * 0.7f);
-        {
-            Theme::drawTextHCentered(window, font, "v1.0  |  SFML 3", Theme::Type::CAPTION,
-                                     Theme::TEXT_MUTED, iconCX, wh - 30.f);
-        }
-        {
-            Theme::drawTextHCentered(window, font, "SELECT A PANEL", Theme::Type::LABEL,
-                                     Theme::TEXT_MUTED, rightX + rightW * 0.5f,
-                                     card1Y - 38.f, sf::Text::Bold);
-        }
-        auto drawPanelCard = [&](float y, float hoverT, bool focused, sf::Color accent,
-                                 const std::string &letter,
-                                 const std::string &title,
-                                 const std::string &subtitle)
-        {
-            // A keyboard-focused card lights up exactly like a hovered one, so
-            // the user can always see what Enter is about to open.
-            float raw = std::max(hoverT, focused ? 1.f : 0.f);
-            float lit = raw * raw * (3.f - 2.f * raw);   // smoothstep
-
-            // Cards lift toward the cursor, same language as the buttons.
-            float lift = 3.f * lit;
-            float cy   = y - lift;
-
-            if (focused)
-                Theme::drawGlow(window, {cardX, cy}, {cardW, cardH}, 14.f, accent,
-                                12.f, 20, 5);
-            else
-                Theme::drawShadow(window, {cardX, cy}, {cardW, cardH}, 14.f,
-                                  14.f + 8.f * lit,
-                                  static_cast<std::uint8_t>(14 + 8 * lit),
-                                  6.f + 3.f * lit, 6);
-
-            sf::Color bg = Theme::lerp(Theme::BG_CARD, Theme::BG_CARD_HOVER, lit);
-
-            // Rim brightens with the lift: a slightly larger rounded rect that
-            // the card is then drawn on top of, leaving a 1.5px ring.
-            if (lit > 0.01f)
-                Theme::fillRoundedRect(window, {cardX - 1.5f, cy - 1.5f},
-                                       {cardW + 3.f, cardH + 3.f}, 15.5f,
-                                       Theme::withAlpha(accent,
-                                           static_cast<std::uint8_t>(130 * lit)));
-
-            Theme::drawCard(window, {cardX, cy}, {cardW, cardH}, bg, 14.f);
-
-            Theme::drawAccentBar(window, cardX, cy, cardH, accent, 4.f);
-            Theme::drawIconCircle(window, font, {cardX + 56.f, cy + cardH * 0.5f},
-                                  26.f, Theme::withAlpha(accent, 55), letter,
-                                  Theme::lerp(accent, sf::Color::White, 0.35f),
-                                  Theme::Type::HEADING);
-            Theme::drawText(window, font, title, Theme::Type::TITLE,
-                            Theme::TEXT_PRIMARY,
-                            {cardX + 100.f, cy + cardH * 0.5f - 34.f}, sf::Text::Bold);
-            Theme::drawText(window, font, subtitle, Theme::Type::META,
-                            Theme::TEXT_SECONDARY,
-                            {cardX + 100.f, cy + cardH * 0.5f + 8.f});
-
-            // Chevron slides right as the card lights up.
-            Theme::drawCenteredText(window, font, ">", Theme::Type::HEADING,
-                                    Theme::lerp(Theme::TEXT_MUTED, accent, lit),
-                                    {{cardX + cardW - 44.f + 5.f * lit,
-                                      cy + cardH * 0.5f - 16.f},
-                                     {32.f, 32.f}},
-                                    sf::Text::Bold);
-        };
-
-        drawPanelCard(card1Y, card1HoverT, focus == F_USER, Theme::ACCENT, "U", "User Panel",
-                      "Login or register to browse bus routes");
-        drawPanelCard(card2Y, card2HoverT, focus == F_ADMIN, Theme::PURPLE, "A", "Admin Panel",
-                      "Manage universities, buses and routes");
-
-        exitBtn.draw(window);
-        window.display();
-    }
+    ScreenManager app(window, font);
+    app.run(std::make_unique<HomeScreen>(font));
 }

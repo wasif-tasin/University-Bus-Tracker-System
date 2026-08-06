@@ -39,9 +39,10 @@ public:
            ButtonStyle style = ButtonStyle::PRIMARY,
            float radius = 8.f);
 
-    void draw(sf::RenderWindow &window);
-    void update(sf::RenderWindow &window);
-    bool isClicked(sf::RenderWindow &window);
+    void draw(sf::RenderTarget &target);
+
+    void update(sf::Vector2f mouse, float dt);
+    bool isClicked(sf::Vector2f mouse) const;
 
     void setLabel(const std::string &label);
     void setStyle(ButtonStyle style);
@@ -49,12 +50,10 @@ public:
     void setFocused(bool focused);
     bool isFocused() const;
 
-    // Screens that rebuild their buttons every frame must carry the hover
-    // animation across frames themselves: seed it before update(), read it
-    // back after. Without this the easing restarts from 0 every frame and the
-    // hover never visibly ramps up.
     void setHoverT(float t);
     float hoverT() const;
+
+    void settle();
 
     sf::FloatRect getBounds() const;
 };

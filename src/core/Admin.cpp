@@ -195,7 +195,6 @@ void Admin::addBus()
     cout << "Bus ID : ";
     getline(cin, id);
 
-    // Duplicate Check
     ifstream checkFile("data/buses.txt");
 
     string busID;
@@ -309,10 +308,10 @@ void Admin::deleteUniversity()
     string code, name;
     bool found = false;
 
-    while(getline(file, code, '|') &&
-          getline(file, name))
+    while (getline(file, code, '|') &&
+           getline(file, name))
     {
-        if(code == deleteCode)
+        if (code == deleteCode)
         {
             found = true;
             continue;
@@ -327,7 +326,7 @@ void Admin::deleteUniversity()
     remove("data/universities.txt");
     rename("data/temp.txt", "data/universities.txt");
 
-    if(found)
+    if (found)
         cout << "\nUniversity Deleted Successfully.\n";
     else
         cout << "\nUniversity Not Found.\n";
@@ -346,17 +345,17 @@ void Admin::deleteBus()
     ifstream file("data/buses.txt");
     ofstream temp("data/temp.txt");
 
-    string id,name,university,seats,route;
+    string id, name, university, seats, route;
 
     bool found = false;
 
-    while(getline(file,id,'|') &&
-          getline(file,name,'|') &&
-          getline(file,university,'|') &&
-          getline(file,seats,'|') &&
-          getline(file,route))
+    while (getline(file, id, '|') &&
+           getline(file, name, '|') &&
+           getline(file, university, '|') &&
+           getline(file, seats, '|') &&
+           getline(file, route))
     {
-        if(id == deleteID)
+        if (id == deleteID)
         {
             found = true;
             continue;
@@ -373,15 +372,15 @@ void Admin::deleteBus()
     temp.close();
 
     remove("data/buses.txt");
-    rename("data/temp.txt","data/buses.txt");
+    rename("data/temp.txt", "data/buses.txt");
 
-    if(found)
+    if (found)
         cout << "\nBus Deleted Successfully.\n";
     else
         cout << "\nBus Not Found.\n";
 }
 
-bool Admin::login(const string& user, const string& pass)
+bool Admin::login(const string &user, const string &pass)
 {
     ifstream file("data/admin.txt");
     if (!file)
@@ -394,7 +393,6 @@ bool Admin::login(const string& user, const string& pass)
     getline(file, filePassword);
     file.close();
 
-    // Strip any trailing whitespace/newline
     while (!filePassword.empty() && (filePassword.back() == '\r' || filePassword.back() == '\n' || filePassword.back() == ' '))
         filePassword.pop_back();
     while (!fileUsername.empty() && (fileUsername.back() == '\r' || fileUsername.back() == '\n' || fileUsername.back() == ' '))
@@ -403,7 +401,7 @@ bool Admin::login(const string& user, const string& pass)
     return (user == fileUsername && pass == filePassword);
 }
 
-bool Admin::addUniversity(const string& code, const string& name, string& errorMsg)
+bool Admin::addUniversity(const string &code, const string &name, string &errorMsg)
 {
     if (code.empty() || name.empty())
     {
@@ -457,7 +455,7 @@ std::vector<std::pair<std::string, std::string>> Admin::getUniversities()
     return list;
 }
 
-bool Admin::addBus(const string& id, const string& name, const string& university, int seats, const string& route, string& errorMsg)
+bool Admin::addBus(const string &id, const string &name, const string &university, int seats, const string &route, string &errorMsg)
 {
     if (id.empty() || name.empty() || university.empty() || route.empty())
     {
@@ -470,7 +468,6 @@ bool Admin::addBus(const string& id, const string& name, const string& universit
         return false;
     }
 
-    // Check if university exists
     ifstream checkUni("data/universities.txt");
     bool uniExists = false;
     string uCode, uName;
@@ -490,7 +487,6 @@ bool Admin::addBus(const string& id, const string& name, const string& universit
         return false;
     }
 
-    // Duplicate Check
     ifstream checkFile("data/buses.txt");
     string busID;
     while (getline(checkFile, busID, '|'))
@@ -544,9 +540,12 @@ std::vector<Bus> Admin::getBuses()
         b.setBusID(id);
         b.setBusName(name);
         b.setUniversityCode(university);
-        try {
+        try
+        {
             b.setTotalSeats(std::stoi(seatsStr));
-        } catch(...) {
+        }
+        catch (...)
+        {
             b.setTotalSeats(0);
         }
         b.setRoute(route);
@@ -556,7 +555,7 @@ std::vector<Bus> Admin::getBuses()
     return list;
 }
 
-bool Admin::deleteUniversity(const string& code, string& errorMsg)
+bool Admin::deleteUniversity(const string &code, string &errorMsg)
 {
     if (code.empty())
     {
@@ -606,7 +605,7 @@ bool Admin::deleteUniversity(const string& code, string& errorMsg)
     }
 }
 
-bool Admin::deleteBus(const string& id, string& errorMsg)
+bool Admin::deleteBus(const string &id, string &errorMsg)
 {
     if (id.empty())
     {
