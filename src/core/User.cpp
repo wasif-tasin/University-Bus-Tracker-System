@@ -1,10 +1,41 @@
 #include "User.h"
 
+#include <cctype>
 #include <iostream>
 #include <fstream>
 #include <string>
 
 using namespace std;
+
+namespace
+{
+    string toLower(const string &s)
+    {
+        string out = s;
+        for (char &c : out)
+            c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        return out;
+    }
+
+    string trim(const string &s)
+    {
+        size_t b = s.find_first_not_of(" \t\r\n");
+        if (b == string::npos)
+            return "";
+        size_t e = s.find_last_not_of(" \t\r\n");
+        return s.substr(b, e - b + 1);
+    }
+
+    bool equalsIgnoreCase(const string &a, const string &b)
+    {
+        return toLower(trim(a)) == toLower(trim(b));
+    }
+
+    bool containsIgnoreCase(const string &haystack, const string &needle)
+    {
+        return toLower(haystack).find(toLower(trim(needle))) != string::npos;
+    }
+}
 
 void User::registerUser()
 {
@@ -206,7 +237,7 @@ void User::selectUniversity()
            getline(file, seats, '|') &&
            getline(file, route))
     {
-        if (university == code)
+        if (equalsIgnoreCase(university, code))
         {
             found = true;
 
@@ -247,7 +278,7 @@ void User::searchBus()
            getline(file, seats, '|') &&
            getline(file, route))
     {
-        if (id == searchID)
+        if (equalsIgnoreCase(id, searchID))
         {
             found = true;
 
@@ -291,7 +322,7 @@ void User::searchByStop()
            getline(file, seats, '|') &&
            getline(file, route))
     {
-        if (route.find(stop) != string::npos)
+        if (containsIgnoreCase(route, stop))
         {
             found = true;
 
@@ -445,7 +476,7 @@ std::vector<Bus> User::getBusesForUniversity(const string &universityCode)
         while (!route.empty() && (route.back() == '\r' || route.back() == '\n'))
             route.pop_back();
 
-        if (university == universityCode)
+        if (equalsIgnoreCase(university, universityCode))
         {
             Bus b;
             b.setBusID(id);
@@ -484,7 +515,7 @@ std::vector<Bus> User::searchBus(const string &busID)
         while (!route.empty() && (route.back() == '\r' || route.back() == '\n'))
             route.pop_back();
 
-        if (id == busID)
+        if (equalsIgnoreCase(id, busID))
         {
             Bus b;
             b.setBusID(id);
@@ -524,7 +555,7 @@ std::vector<Bus> User::searchByStop(const string &stopName)
         while (!route.empty() && (route.back() == '\r' || route.back() == '\n'))
             route.pop_back();
 
-        if (route.find(stopName) != string::npos)
+        if (containsIgnoreCase(route, stopName))
         {
             Bus b;
             b.setBusID(id);
